@@ -422,7 +422,7 @@ class Engine(object):
             for item, data in itertools.izip(items, results):
                 with item.loading(self):
                     for key, val in data.items():
-                        setattr(item, key, val)
+                        item.set_ddb_val(key, val)
 
     def sync(self, items, atomic=True, consistent=False):
         """
