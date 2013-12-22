@@ -25,7 +25,7 @@ class Widget(Model):
     wobbles = Field(data_type=bool)
 
     def __init__(self, **kwargs):
-        self.string2 = 'abc'
+        self.string = 'abc'
         for key, val in kwargs.iteritems():
             setattr(self, key, val)
 
@@ -38,7 +38,7 @@ class TestFields(BaseSystemTest):
     def test_field_default(self):
         """ If fields are not set, they default to a reasonable value """
         w = Widget()
-        self.assertIsNone(w.string)
+        self.assertIsNone(w.string2)
         self.assertIsNone(w.binary)
         self.assertEquals(w.num, 0)
         self.assertEquals(w.str_set, set())
@@ -46,6 +46,30 @@ class TestFields(BaseSystemTest):
         self.assertEquals(w.bin_set, set())
         self.assertEquals(w.data, {})
         self.assertEquals(w.wobbles, False)
+
+    def test_no_save_defaults(self):
+        """ Default field values are not saved to dynamo """
+        w = Widget(string2='abc')
+        self.engine.sync(w)
+        table = w.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertEquals(result, {
+            'string': w.string,
+            'string2': w.string2,
+        })
+
+    def test_sync_twice_no_defaults(self):
+        """ Syncing twice should still not save any defaults """
+        w = Widget(string2='abc')
+        self.engine.sync(w)
+        w.string2 = 'def'
+        w.sync()
+        table = w.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertEquals(result, {
+            'string': w.string,
+            'string2': w.string2,
+        })
 
     def test_set_updates(self):
         """ Sets track changes and update during sync() """
@@ -70,7 +94,7 @@ class TestFields(BaseSystemTest):
         """ Replaced sets also track changes for updates """
         w = Widget(string='a')
         w.str_set = set(['hi'])
-        self.engine.save(w)
+        self.engine.sync(w)
         w.str_set.add('foo')
         w.sync()
         stored_widget = self.engine.scan(Widget).all()[0]
@@ -88,14 +112,14 @@ class TestFields(BaseSystemTest):
     def test_store_bool(self):
         """ Dicts track changes and update during sync() """
         w = Widget(string='a', wobbles=True)
-        self.engine.save(w)
+        self.engine.sync(w)
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertTrue(stored_widget.wobbles is True)
 
     def test_store_extra_number(self):
         """ Extra number fields are stored as numbers """
         w = Widget(string='a', foobar=5)
-        self.engine.save(w)
+        self.engine.sync(w)
 
         table = Widget.meta_.ddb_table(self.dynamo)
         result = list(table.scan())[0]
@@ -106,7 +130,7 @@ class TestFields(BaseSystemTest):
     def test_store_extra_string(self):
         """ Extra string fields are stored as json strings """
         w = Widget(string='a', foobar='hi')
-        self.engine.save(w)
+        self.engine.sync(w)
 
         table = Widget.meta_.ddb_table(self.dynamo)
         result = list(table.scan())[0]
@@ -118,7 +142,7 @@ class TestFields(BaseSystemTest):
         """ Extra set fields are stored as sets """
         foobar = set(['hi'])
         w = Widget(string='a', foobar=foobar)
-        self.engine.save(w)
+        self.engine.sync(w)
 
         table = Widget.meta_.ddb_table(self.dynamo)
         result = list(table.scan())[0]

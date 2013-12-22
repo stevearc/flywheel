@@ -62,7 +62,7 @@ failure::
 Get all scores on Comet Quest that are over 9000::
 
     >>> scores = engine.query(GameScore).filter(GameScore.top_score > 9000,
-    ...                                         title='Alien Adventure').all()
+    ...                                         title='Comet Quest').all()
 
 
 Development
@@ -85,9 +85,11 @@ installed.
 
 TODO
 ====
-* Documentation
+* Store lists
+* datetime serialization
+* Maybe use python types for field declarations (can you index sets?)
 * Indexes with different projections
-* transactions
+* Documentation
 * migration engine
 * Update boto Table.scan to take attributes=[] argument (for faster deletes)
 * Cross-table linking (One and Many)
@@ -96,3 +98,4 @@ Notes
 =====
 Syncing fields that are part of a composite field is ONLY safe if you use atomic. Otherwise your data could become corrupted
 corrollary: if you use incr on a field that is part of an atomic field, it will FORCE the sync to be atomic
+Syncing when only primary keys are set will do nothing

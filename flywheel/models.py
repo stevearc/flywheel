@@ -563,20 +563,21 @@ class Model(object):
 
     def mark_dirty_(self, name):
         """ Mark that a field is dirty """
-        if self.__dirty__ is not None:
-            if not self._loading and name in self.__incrs__:
-                raise ValueError("Cannot increment field '%s' and set it in "
-                                 "the same update!" % name)
-            if name in self.meta_.fields:
-                self.__dirty__.update(self.meta_.related_fields[name])
-                # Never mark the primary key as dirty
-                if self.meta_.hash_key.name in self.__dirty__:
-                    self.__dirty__.remove(self.meta_.hash_key.name)
-                if (self.meta_.range_key is not None and
-                        self.meta_.range_key.name in self.__dirty__):
-                    self.__dirty__.remove(self.meta_.range_key.name)
-            else:
-                self.__dirty__.add(name)
+        if self._loading or self.__dirty__ is None:
+            return
+        if name in self.__incrs__:
+            raise ValueError("Cannot increment field '%s' and set it in "
+                             "the same update!" % name)
+        if name in self.meta_.fields:
+            self.__dirty__.update(self.meta_.related_fields[name])
+            # Never mark the primary key as dirty
+            if self.meta_.hash_key.name in self.__dirty__:
+                self.__dirty__.remove(self.meta_.hash_key.name)
+            if (self.meta_.range_key is not None and
+                    self.meta_.range_key.name in self.__dirty__):
+                self.__dirty__.remove(self.meta_.range_key.name)
+        else:
+            self.__dirty__.add(name)
 
     def get(self, name, default=None):
         """ Dict-style getter for overflow attrs """

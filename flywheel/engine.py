@@ -457,6 +457,8 @@ class Engine(object):
             for name, field in item.meta_.fields.iteritems():
                 if field.is_mutable and name not in item.__dirty__:
                     cached_var = item.cached_(name)
+                    if cached_var is None:
+                        cached_var = field.default
                     if field.resolve(item) != cached_var:
                         item.__dirty__.add(name)
 
@@ -464,6 +466,7 @@ class Engine(object):
                 update_models.append(item)
                 continue
             fields = item.__dirty__
+            item.pre_save(self)
 
             # If the model has incremented any field that is part of a
             # composite field, FORCE the sync to be atomic. This prevents the
@@ -520,7 +523,6 @@ class Engine(object):
                 key[item.meta_.range_key.name] = DYNAMIZER.encode(item.rk_)
 
             # Perform sync
-            item.pre_save(self)
             ret = self.dynamo.update_item(item.meta_.ddb_tablename, key, data,
                                           expected=expected,
                                           return_values='ALL_NEW')
