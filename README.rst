@@ -85,8 +85,6 @@ installed.
 
 TODO
 ====
-* Store lists
-* datetime serialization
 * Maybe use python types for field declarations (can you index sets?)
 * Indexes with different projections
 * Documentation
@@ -96,6 +94,7 @@ TODO
 
 Notes
 =====
-Syncing fields that are part of a composite field is ONLY safe if you use atomic. Otherwise your data could become corrupted
-corrollary: if you use incr on a field that is part of an atomic field, it will FORCE the sync to be atomic
-Syncing when only primary keys are set will do nothing
+* Syncing fields that are part of a composite field is ONLY safe if you use atomic. Otherwise your data could become corrupted
+* corrollary: if you use incr on a field that is part of an atomic field, it will FORCE the sync to be atomic
+* Syncing when only primary keys are set will do nothing
+* datetime types must be utc

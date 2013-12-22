@@ -1,4 +1,5 @@
 """ Field declarations for models """
+from datetime import datetime
 import json
 from boto.dynamodb.types import Binary
 from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
@@ -259,7 +260,7 @@ class Field(object):
             raise TypeError("hash_key, range_key, and index are "
                             "mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
-                             BINARY_SET, dict, bool):
+                             BINARY_SET, dict, bool, list, datetime):
             raise TypeError("Unknown data type '%s'" % data_type)
         self.name = None
         self.model = None
@@ -285,39 +286,55 @@ class Field(object):
                 if self._coerce:
                     return str(value)
                 else:
-                    raise ValueError("Field '%s' must be a string!" %
-                                     self.name)
+                    raise ValueError("Field '%s' must be a string! %s" %
+                                     (self.name, value))
         elif self.data_type == NUMBER:
             if not (isinstance(value, int) or isinstance(value, float) or
                     isinstance(value, Decimal)):
                 if self._coerce:
                     return Decimal(value)
                 else:
-                    raise ValueError("Field '%s' must be a number!" %
-                                     self.name)
+                    raise ValueError("Field '%s' must be a number! %s" %
+                                     (self.name, value))
         elif self.data_type == BINARY:
             if not isinstance(value, Binary):
                 if self._coerce:
                     return Binary(value)
                 else:
-                    raise ValueError("Field '%s' must be a Binary!" %
-                                     self.name)
+                    raise ValueError("Field '%s' must be a Binary! %s" %
+                                     (self.name, value))
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET):
             if not isinstance(value, set):
                 if self._coerce:
                     return set(value)
                 else:
-                    raise ValueError("Field '%s' must be a set!" % self.name)
+                    raise ValueError("Field '%s' must be a set! %s" %
+                                     (self.name, value))
         elif self.data_type == dict:
             if not isinstance(value, dict):
-                if not self._coerce:
-                    raise ValueError("Field '%s' must be a dict!" % self.name)
+                if self._coerce:
+                    return dict(value)
+                else:
+                    raise ValueError("Field '%s' must be a dict! %s" %
+                                     (self.name, value))
+        elif self.data_type == list:
+            if not isinstance(value, list):
+                if self._coerce:
+                    return list(value)
+                else:
+                    raise ValueError("Field '%s' must be a list! %s" %
+                                     (self.name, value))
         elif self.data_type == bool:
             if not isinstance(value, bool):
                 if self._coerce:
                     return bool(value)
                 else:
-                    raise ValueError("Field '%s' must be a bool!" % self.name)
+                    raise ValueError("Field '%s' must be a bool! %s" %
+                                     (self.name, value))
+        elif self.data_type == datetime:
+            if not isinstance(value, datetime):
+                raise ValueError("Field '%s' must be a datetime! %s" %
+                                 (self.name, value))
         return value
 
     def can_resolve(self, fields):
@@ -349,14 +366,19 @@ class Field(object):
     @property
     def is_mutable(self):
         """ Return True if the data type is a set """
-        return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, dict)
+        return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, dict,
+                                  list)
 
     def ddb_dump(self, value):
         """ Dump a value to its Dynamo format """
-        if self.data_type == dict:
+        if value is None:
+            return None
+        if self.data_type in (dict, list):
             return json.dumps(value)
         elif self.data_type == bool:
             return int(value)
+        elif self.data_type == datetime:
+            return float(value.strftime('%s.%f'))
         return value
 
     def ddb_load(self, val):
@@ -366,10 +388,12 @@ class Field(object):
                 val = int(val)
             else:
                 val = float(val)
-        if self.data_type == dict:
+        if self.data_type in (dict, list):
             return json.loads(val)
         elif self.data_type == bool:
             return bool(val)
+        elif self.data_type == datetime:
+            return datetime.fromtimestamp(val)
         return val
 
     @classmethod
@@ -415,6 +439,8 @@ class Field(object):
             return {}
         elif self.data_type == bool:
             return False
+        elif self.data_type == list:
+            return []
 
     def __eq__(self, other):
         if self.overflow:

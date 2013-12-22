@@ -1,4 +1,5 @@
 """ Tests for fields """
+from datetime import datetime
 import json
 
 from . import BaseSystemTest
@@ -22,6 +23,8 @@ class Widget(Model):
     num_set = Field(data_type=NUMBER_SET)
     bin_set = Field(data_type=BINARY_SET)
     data = Field(data_type=dict)
+    friends = Field(data_type=list)
+    created = Field(data_type=datetime)
     wobbles = Field(data_type=bool)
 
     def __init__(self, **kwargs):
@@ -46,6 +49,8 @@ class TestFields(BaseSystemTest):
         self.assertEquals(w.bin_set, set())
         self.assertEquals(w.data, {})
         self.assertEquals(w.wobbles, False)
+        self.assertEquals(w.friends, [])
+        self.assertIsNone(w.created)
 
     def test_no_save_defaults(self):
         """ Default field values are not saved to dynamo """
@@ -108,6 +113,22 @@ class TestFields(BaseSystemTest):
         w.sync()
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(w.data, stored_widget.data)
+
+    def test_list_updates(self):
+        """ Lists track changes and update during sync() """
+        w = Widget(string='a')
+        self.engine.save(w)
+        w.friends.append('Fred')  # pylint: disable=E1101
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(w.friends, stored_widget.friends)
+
+    def test_datetime(self):
+        """ Can store datetime & it gets returned as datetime """
+        w = Widget(string='a', created=datetime.utcnow())
+        self.engine.sync(w)
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(w.created, stored_widget.created)
 
     def test_store_bool(self):
         """ Dicts track changes and update during sync() """
