@@ -15,7 +15,9 @@ class TestScan(BaseSystemTest):
         self.engine.save([u, u2])
 
         results = self.engine.scan(User).all()
-        self.assertItemsEqual(results, [u, u2])
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
 
     def test_limit(self):
         """ Scan can have a limit """
@@ -63,7 +65,9 @@ class TestScan(BaseSystemTest):
         self.engine.save([u, u2, u3])
 
         results = self.engine.scan(User).filter(User.name <= u2.name).all()
-        self.assertItemsEqual(results, [u, u2])
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
 
     def test_filter_gt(self):
         """ Scan can filter gt """
@@ -183,7 +187,9 @@ class TestScanFilterOverflow(BaseSystemTest):
 
         results = self.engine.scan(User)\
             .filter(User.field_('foobar') >= 2).all()
-        self.assertItemsEqual(results, [u2, u3])
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u2 in results)
+        self.assertTrue(u3 in results)
 
     def test_filter_beginswith(self):
         """ Scan overflow field can filter beginswith """
