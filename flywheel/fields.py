@@ -255,12 +255,13 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=STRING, coerce=False, nullable=True, check=None):
+                 data_type=unicode, coerce=False, nullable=True, check=None):
         if sum((hash_key, range_key, bool(index))) > 1:
             raise TypeError("hash_key, range_key, and index are "
                             "mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
-                             BINARY_SET, dict, bool, list, datetime):
+                             BINARY_SET, dict, bool, list, datetime, str,
+                             unicode, int, float, set):
             raise TypeError("Unknown data type '%s'" % data_type)
         self.name = None
         self.model = None
@@ -281,61 +282,159 @@ class Field(object):
         """ Coerce the value to the field's data type """
         if value is None:
             return value
-        if self.data_type == STRING:
-            if not isinstance(value, basestring):
+        if self.data_type in (STRING, unicode):
+            if not isinstance(value, unicode):
+                # Auto-convert str to unicode using utf-8
+                if isinstance(value, str):
+                    return value.decode('utf-8')
+                if self._coerce:
+                    return unicode(value)
+                else:
+                    raise ValueError("Field '%s' must be a unicode string! %s" %
+                                     (self.name, repr(value)))
+        elif self.data_type == str:
+            if not isinstance(value, str):
+                # Auto-convert unicode to str using utf-8
+                if isinstance(value, unicode):
+                    return value.encode('utf-8')
                 if self._coerce:
                     return str(value)
                 else:
-                    raise ValueError("Field '%s' must be a string! %s" %
-                                     (self.name, value))
-        elif self.data_type == NUMBER:
+                    raise ValueError("Field '%s' must be a byte string! %s" %
+                                     (self.name, repr(value)))
+        elif self.data_type in (NUMBER, int, float):
             if not (isinstance(value, int) or isinstance(value, float) or
                     isinstance(value, Decimal)):
                 if self._coerce:
                     return Decimal(value)
                 else:
                     raise ValueError("Field '%s' must be a number! %s" %
-                                     (self.name, value))
+                                     (self.name, repr(value)))
         elif self.data_type == BINARY:
             if not isinstance(value, Binary):
                 if self._coerce:
                     return Binary(value)
                 else:
                     raise ValueError("Field '%s' must be a Binary! %s" %
-                                     (self.name, value))
-        elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET):
+                                     (self.name, repr(value)))
+        elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             if not isinstance(value, set):
                 if self._coerce:
                     return set(value)
                 else:
                     raise ValueError("Field '%s' must be a set! %s" %
-                                     (self.name, value))
+                                     (self.name, repr(value)))
         elif self.data_type == dict:
             if not isinstance(value, dict):
                 if self._coerce:
                     return dict(value)
                 else:
                     raise ValueError("Field '%s' must be a dict! %s" %
-                                     (self.name, value))
+                                     (self.name, repr(value)))
         elif self.data_type == list:
             if not isinstance(value, list):
                 if self._coerce:
                     return list(value)
                 else:
                     raise ValueError("Field '%s' must be a list! %s" %
-                                     (self.name, value))
+                                     (self.name, repr(value)))
         elif self.data_type == bool:
             if not isinstance(value, bool):
                 if self._coerce:
                     return bool(value)
                 else:
                     raise ValueError("Field '%s' must be a bool! %s" %
-                                     (self.name, value))
+                                     (self.name, repr(value)))
         elif self.data_type == datetime:
             if not isinstance(value, datetime):
                 raise ValueError("Field '%s' must be a datetime! %s" %
-                                 (self.name, value))
+                                 (self.name, repr(value)))
         return value
+
+    @property
+    def is_mutable(self):
+        """ Return True if the data type is a set """
+        return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, dict,
+                                  list, set)
+
+    def ddb_dump(self, value):
+        """ Dump a value to its Dynamo format """
+        if value is None:
+            return None
+        if self.data_type in (dict, list):
+            return json.dumps(value)
+        elif self.data_type == bool:
+            return int(value)
+        elif self.data_type == datetime:
+            return float(value.strftime('%s.%f'))
+        elif self.data_type == str:
+            return value.decode('utf-8')
+        return value
+
+    def ddb_load(self, val):
+        """ Decode a value retrieved from Dynamo """
+        if isinstance(val, Decimal):
+            if val % 1 == 0:
+                val = int(val)
+            else:
+                val = float(val)
+        if self.data_type in (dict, list):
+            return json.loads(val)
+        elif self.data_type == bool:
+            return bool(val)
+        elif self.data_type == datetime:
+            return datetime.fromtimestamp(val)
+        elif self.data_type == str:
+            return val.encode('utf-8')
+        return val
+
+    @classmethod
+    def ddb_dump_overflow(cls, val):
+        """ Dump an overflow value to its Dynamo format """
+        if val is None:
+            return None
+        elif isinstance(val, int) or isinstance(val, float):
+            return val
+        elif isinstance(val, set):
+            return val
+        else:
+            return json.dumps(val)
+
+    @classmethod
+    def ddb_load_overflow(cls, val):
+        """ Decode a value of an overflow field """
+        if (isinstance(val, Decimal) or isinstance(val, float) or
+           isinstance(val, int)):
+            return val
+        elif isinstance(val, set):
+            return val
+        else:
+            return json.loads(val)
+
+    @property
+    def default(self):
+        """ The default value for a field of this type """
+        if self.data_type in (STRING, BINARY, str, unicode):
+            return None
+        elif self.data_type in (NUMBER, int, float):
+            return 0
+        elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
+            return set()
+        elif self.data_type == dict:
+            return {}
+        elif self.data_type == bool:
+            return False
+        elif self.data_type == list:
+            return []
+
+    @property
+    def ddb_data_type(self):
+        """ Get the DynamoDB data type as used by boto """
+        if self.data_type in (int, float, bool, datetime):
+            return NUMBER
+        elif self.data_type in (str, unicode, list, dict):
+            return STRING
+        return self.data_type
 
     def can_resolve(self, fields):
         """
@@ -363,84 +462,12 @@ class Field(object):
                 needed.update(resolve)
         return needed
 
-    @property
-    def is_mutable(self):
-        """ Return True if the data type is a set """
-        return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, dict,
-                                  list)
-
-    def ddb_dump(self, value):
-        """ Dump a value to its Dynamo format """
-        if value is None:
-            return None
-        if self.data_type in (dict, list):
-            return json.dumps(value)
-        elif self.data_type == bool:
-            return int(value)
-        elif self.data_type == datetime:
-            return float(value.strftime('%s.%f'))
-        return value
-
-    def ddb_load(self, val):
-        """ Decode a value retrieved from Dynamo """
-        if isinstance(val, Decimal):
-            if val % 1 == 0:
-                val = int(val)
-            else:
-                val = float(val)
-        if self.data_type in (dict, list):
-            return json.loads(val)
-        elif self.data_type == bool:
-            return bool(val)
-        elif self.data_type == datetime:
-            return datetime.fromtimestamp(val)
-        return val
-
-    @classmethod
-    def ddb_dump_overflow(cls, val):
-        """ Dump an overflow value to its Dynamo format """
-        if val is None:
-            return None
-        elif isinstance(val, int) or isinstance(val, float):
-            return val
-        elif isinstance(val, set):
-            return val
-        else:
-            return json.dumps(val)
-
-    @classmethod
-    def ddb_load_overflow(cls, val):
-        """ Decode a value of an overflow field """
-        if (isinstance(val, Decimal) or isinstance(val, float) or
-           isinstance(val, int)):
-            return val
-        elif isinstance(val, set):
-            return val
-        else:
-            return json.loads(val)
-
     def resolve(self, obj=None, scope=None):
         """ Resolve a field value from an object or scope dict """
         if obj is not None:
             return getattr(obj, self.name)
         else:
             return scope[self.name]
-
-    @property
-    def default(self):
-        """ The default value for a field of this type """
-        if self.data_type in (STRING, BINARY):
-            return None
-        elif self.data_type == NUMBER:
-            return 0
-        elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET):
-            return set()
-        elif self.data_type == dict:
-            return {}
-        elif self.data_type == bool:
-            return False
-        elif self.data_type == list:
-            return []
 
     def __eq__(self, other):
         if self.overflow:
@@ -498,7 +525,7 @@ class Field(object):
         """
         if self.overflow:
             other = '"' + other
-        elif self.data_type != STRING:
+        elif self.data_type not in (STRING, str, unicode):
             raise TypeError("Field '%s' is not a string! Cannot use "
                             "'beginswith' constraint." % self.name)
         return Condition.construct(self.name, 'beginswith', other)

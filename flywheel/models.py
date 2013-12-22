@@ -361,21 +361,21 @@ class ModelMetadata(object):
         }
 
         hash_key = HashKey(self.hash_key.name,
-                           data_type=self.hash_key.data_type)
+                           data_type=self.hash_key.ddb_data_type)
         schema = [hash_key.schema()]
         for name, field in self.fields.iteritems():
             if field.hash_key:
                 f = hash_key
             elif field.range_key:
-                f = RangeKey(name, data_type=field.data_type)
+                f = RangeKey(name, data_type=field.ddb_data_type)
                 schema.append(f.schema())
             elif field.index:
                 index_name = '%s-index' % name
-                f = RangeKey(name, data_type=field.data_type)
+                f = RangeKey(name, data_type=field.ddb_data_type)
                 idx = AllIndex(index_name, [hash_key, f])
                 indexes.append(idx.schema())
             elif any(map(lambda x: name in x, self.global_indexes)):
-                f = BaseSchemaField(name, data_type=field.data_type)
+                f = BaseSchemaField(name, data_type=field.ddb_data_type)
             else:
                 continue
             attrs.append(f.definition())

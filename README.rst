@@ -17,7 +17,7 @@ API documentation
 <http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html>`_)
 ::
 
-    from flywheel import Model, Field, GlobalIndex, NUMBER
+    from flywheel import Model, Field, GlobalIndex
 
     class GameScore(Model):
         __metadata__ = {
@@ -27,10 +27,10 @@ API documentation
         }
         userid = Field(hash_key=True)
         title = Field(range_key=True)
-        top_score = Field(data_type=NUMBER)
+        top_score = Field(data_type=int)
         top_score_time = Field()
-        wins = Field(data_type=NUMBER)
-        losses = Field(data_type=NUMBER)
+        wins = Field(data_type=int)
+        losses = Field(data_type=int)
 
         def __init__(self, title, userid):
             self.title = title
@@ -85,7 +85,6 @@ installed.
 
 TODO
 ====
-* Maybe use python types for field declarations (can you index sets?)
 * Indexes with different projections
 * Documentation
 * migration engine
