@@ -82,12 +82,14 @@ class Query(object):
         return list(self.gen(reverse=reverse, consistent=consistent,
                              attributes=attributes))
 
-    def first(self, consistent=False, attributes=None):
+    def first(self, reverse=False, consistent=False, attributes=None):
         """
         Return the first result of the query, or None if no results
 
         Parameters
         ----------
+        reverse : bool, optional
+            Return results in reverse order (default False)
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
@@ -95,7 +97,8 @@ class Query(object):
             ResultItems instead of model objects.
 
         """
-        for result in self.gen(consistent=consistent, attributes=attributes):
+        for result in self.gen(reverse=reverse, consistent=consistent,
+                               attributes=attributes):
             return result
         return None
 
