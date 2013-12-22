@@ -1,0 +1,5 @@
+pylint
+pep8
+autopep8
+tox
+nose
