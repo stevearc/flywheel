@@ -14,7 +14,7 @@ Getting Started
 ===============
 This is what a basic model looks like (schema taken from this `DynamoDB
 API documentation
-<http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html>`_
+<http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html>`_)
 ::
 
     from flywheel import Model, Field, GlobalIndex, NUMBER
