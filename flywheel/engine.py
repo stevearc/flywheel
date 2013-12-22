@@ -1,6 +1,7 @@
 """ Query engine """
 import itertools
 
+from boto.dynamodb2 import connect_to_region
 from boto.dynamodb2.items import Item
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.types import Dynamizer
@@ -227,7 +228,7 @@ class Engine(object):
 
     Parameters
     ----------
-    dynamo : :class:`boto.dynamodb2.DynamoDBConnection`
+    dynamo : :class:`boto.dynamodb2.DynamoDBConnection`, optional
     namespace : list, optional
         List of namespace component strings for models
 
@@ -276,11 +277,15 @@ class Engine(object):
 
     """
 
-    def __init__(self, dynamo, namespace=None):
+    def __init__(self, dynamo=None, namespace=None):
         self.dynamo = dynamo
         self.models = {}
         self.namespace = namespace or []
         ModelMetadata.namespace = self.namespace
+
+    def connect_to_region(self, region, **kwargs):
+        """ Connect to an AWS region """
+        self.dynamo = connect_to_region(region, **kwargs)
 
     def register(self, *models):
         """

@@ -5,7 +5,7 @@ import contextlib
 import boto.dynamodb.types
 import copy
 import inspect
-from boto.dynamodb2.fields import HashKey, RangeKey, AllIndex, BaseSchemaField
+from boto.dynamodb2.fields import HashKey, RangeKey, AllIndex, GlobalAllIndex, BaseSchemaField
 from boto.dynamodb2.table import Table
 from boto.exception import JSONResponseError
 from collections import defaultdict
@@ -351,17 +351,14 @@ class ModelMetadata(object):
         hash_key = None
         raw_attrs = {}
 
-        def convert_throughput(tp):
-            """ Convert a simple throughput dict to AWS format """
-            return {
-                'ReadCapacityUnits': tp['read'],
-                'WriteCapacityUnits': tp['write'],
-            }
-
         if throughput is not None:
-            table_throughput = convert_throughput(throughput)
+            table_throughput = throughput
         else:
-            table_throughput = convert_throughput(self.throughput)
+            table_throughput = self.throughput
+        table_throughput = {
+            'ReadCapacityUnits': table_throughput['read'],
+            'WriteCapacityUnits': table_throughput['write'],
+        }
 
         hash_key = HashKey(self.hash_key.name,
                            data_type=self.hash_key.data_type)
@@ -375,7 +372,7 @@ class ModelMetadata(object):
             elif field.index:
                 index_name = '%s-index' % name
                 f = RangeKey(name, data_type=field.data_type)
-                idx = AllIndex(index_name, parts=[hash_key, f])
+                idx = AllIndex(index_name, [hash_key, f])
                 indexes.append(idx.schema())
             elif any(map(lambda x: name in x, self.global_indexes)):
                 f = BaseSchemaField(name, data_type=field.data_type)
@@ -393,16 +390,13 @@ class ModelMetadata(object):
                                      data_type=raw_attrs[gindex.range_key]
                                      .data_type)
                 parts.append(range_key)
-            index = AllIndex(gindex.name, parts=parts)
-            s = index.schema()
-            # Manually add throughput until boto supports global indexes
             if throughput is not None and gindex.name in throughput:
-                s['ProvisionedThroughput'] = convert_throughput(
-                    throughput[gindex.name])
+                index_throughput = throughput[gindex.name]
             else:
-                s['ProvisionedThroughput'] = convert_throughput(
-                    gindex.throughput)
-            global_indexes.append(s)
+                index_throughput = gindex.throughput
+            index = GlobalAllIndex(gindex.name, parts,
+                                   throughput=index_throughput)
+            global_indexes.append(index.schema())
 
         # Make sure indexes & global indexes either have data or are None
         indexes = indexes or None

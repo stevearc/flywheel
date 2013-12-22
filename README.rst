@@ -88,6 +88,7 @@ TODO
 * Documentation
 * Indexes with different projections
 * transactions
+* migration engine
 * Update boto Table.scan to take attributes=[] argument (for faster deletes)
 * Cross-table linking (One and Many)
 
