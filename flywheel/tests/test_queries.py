@@ -162,7 +162,9 @@ class TestQueries(BaseSystemTest):
 
         results = self.engine.query(User).filter(User.id == 'a')\
             .filter(User.name <= u2.name).all()
-        self.assertItemsEqual(results, [u, u2])
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
 
     def test_filter_gt(self):
         """ Queries can filter gt """
