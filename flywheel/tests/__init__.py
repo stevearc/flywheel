@@ -7,16 +7,16 @@ import nose
 import shutil
 import subprocess
 import tempfile
+from boto.dynamodb2 import connect_to_region
+from boto.dynamodb2.layer1 import DynamoDBConnection
+from flywheel.engine import Engine
+from urllib import urlretrieve
+
+
 try:
     import unittest2 as unittest  # pylint: disable=F0401
 except ImportError:
     import unittest
-from boto.dynamodb2.layer1 import DynamoDBConnection
-from boto.dynamodb2 import connect_to_region
-from redis import StrictRedis
-from urllib import urlretrieve
-
-from flywheel.engine import Engine
 
 
 DYNAMO_LOCAL = 'https://s3-us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_2013-12-12.tar.gz'
