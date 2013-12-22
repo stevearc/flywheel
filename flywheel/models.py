@@ -250,33 +250,6 @@ class ModelMetadata(object):
                 return order
         raise ValueError("Cannot find ordering with index name '%s'" % index)
 
-    def get_ordering(self, hash_key=None, range_key=None, filter=None):
-        """
-        Get a single ordering
-
-        Parameters
-        ----------
-        hash_key : str, optional
-            The ordering's hash key must match this name
-        range_key : str, optional
-            The ordering's range key must match this name
-        filter : callable, optional
-            Function that returns True if order is valid, False otherwise
-
-        """
-        orderings = []
-        for order in self.orderings:
-            if hash_key is not None and order.hash_key.name != hash_key:
-                continue
-            if (range_key is not None and order.range_key is not None and
-                    order.range_key.name != range_key):
-                continue
-            if filter is None or filter(order):
-                orderings.append(order)
-        if len(orderings) != 1:
-            raise ValueError("Exactly one ordering not found: %s" % orderings)
-        return orderings[0]
-
     def rk(self, obj=None, scope=None):
         """ Construct the range key value """
         if self.range_key is not None:
