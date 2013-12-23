@@ -455,7 +455,13 @@ class Field(object):
         elif self.data_type == int:
             if not isinstance(value, int):
                 if force_coerce:
-                    return Decimal(value)
+                    new_val = int(value)
+                    if isinstance(value, float) or isinstance(value, Decimal):
+                        if new_val != value:
+                            raise ValueError("Field '%s' refusing to convert "
+                                             "%s to int! Results in data loss!"
+                                             % (self.name, repr(value)))
+                    return new_val
                 else:
                     raise TypeError("Field '%s' must be an int! %s" %
                                     (self.name, repr(value)))

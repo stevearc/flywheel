@@ -1,6 +1,7 @@
 """ Tests for models """
 import json
 from boto.dynamodb2.exceptions import ConditionalCheckFailedException
+from decimal import Decimal
 
 from . import BaseSystemTest
 from flywheel import Field, Composite, Model, NUMBER, GlobalIndex
@@ -45,8 +46,9 @@ class Post(Model):
     c_all = Composite('userid', 'id', 'about', 'text')
     score = Composite('likes', 'ts', data_type=NUMBER,
                       merge=lambda x, y: x + y)
-    likes = Field(data_type=NUMBER)
-    ts = Field(data_type=NUMBER)
+    likes = Field(data_type=int)
+    ts = Field(data_type=float)
+    points = Field(data_type=Decimal)
     about = Field()
     text = Field()
 
@@ -350,6 +352,26 @@ class TestModelMutation(BaseSystemTest):
         p2.sync(atomic=False)
         self.assertEquals(p2.foobar, 8)
 
+    def test_incr_float(self):
+        """ Increment works on floats """
+        p = Post('a', 'b', 4.5)
+        self.engine.save(p)
+        p.incr_(ts=5)
+        self.assertEquals(p.ts, 9.5)
+        p.sync()
+        self.assertEquals(p.ts, 9.5)
+
+    def test_incr_decimal(self):
+        """ Increment works on floats """
+        p = Post('a', 'b', 0)
+        p.points = Decimal('1.5')
+        self.engine.save(p)
+        p.incr_(points=2)
+        self.assertEquals(p.points, 3.5)
+        p.sync()
+        self.assertEquals(p.points, 3.5)
+        self.assertTrue(isinstance(p.points, Decimal))
+
     def test_incr_atomic(self):
         """ Parallel increments with atomic=True raises exception """
         p = Post('a', 'b', 4)
@@ -360,6 +382,17 @@ class TestModelMutation(BaseSystemTest):
         p2.incr_(foobar=3)
         with self.assertRaises(ConditionalCheckFailedException):
             p2.sync(atomic=True)
+
+    def test_double_incr(self):
+        """ Incrementing a field twice should work fine """
+        p = Post('a', 'b', 4)
+        p.foobar = 2
+        self.engine.save(p)
+        p.incr_(foobar=5)
+        p.incr_(foobar=3)
+        self.assertEquals(p.foobar, 10)
+        p.sync()
+        self.assertEquals(p.foobar, 10)
 
     def test_incr_set(self):
         """ Increment then set value raises exception """

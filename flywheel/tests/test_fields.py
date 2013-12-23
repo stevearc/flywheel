@@ -157,7 +157,7 @@ class PrimitiveWidget(Model):
     }
     string = Field(data_type=str, hash_key=True)
     string2 = Field(data_type=unicode)
-    num = Field(data_type=int)
+    num = Field(data_type=int, coerce=True)
     num2 = Field(data_type=float)
     binary = Field(data_type=BINARY, coerce=True)
     myset = Field(data_type=set)
@@ -240,6 +240,14 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertEquals(w.price, stored_widget.price)
         self.assertTrue(isinstance(stored_widget.price, Decimal))
+
+    def test_int_no_data_loss(self):
+        """ Int fields refuse to drop floating point data """
+        w = PrimitiveWidget()
+        with self.assertRaises(ValueError):
+            w.num = 4.5
+        with self.assertRaises(ValueError):
+            w.num = Decimal('4.5')
 
     def test_list_updates(self):
         """ Lists track changes and update during sync() """

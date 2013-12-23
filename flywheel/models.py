@@ -8,6 +8,7 @@ from boto.dynamodb2.fields import HashKey, RangeKey, BaseSchemaField
 from boto.dynamodb2.table import Table
 from boto.exception import JSONResponseError
 from collections import defaultdict
+from decimal import Decimal
 
 from .fields import Field, NUMBER
 
@@ -466,7 +467,7 @@ class Model(object):
 
     @classmethod
     def __after_create__(cls):
-        """ Called after class is constructed but before meta_ is set """
+        """ Called after class is constructed and after meta_ is set """
         pass
 
     @classmethod
@@ -606,7 +607,7 @@ class Model(object):
 
             field = self.meta_.fields.get(key)
             if field is not None:
-                if field.data_type != NUMBER:
+                if field.data_type not in (NUMBER, int, float, Decimal):
                     raise ValueError("Cannot increment non-number field '%s'" %
                                      key)
                 if field.composite:
@@ -615,16 +616,17 @@ class Model(object):
             if key in self.__dirty__:
                 raise ValueError("Cannot set field '%s' and increment it in "
                                  "the same update!" % key)
-            self.__incrs__[key] = getattr(self, key, 0) + val
+            self.__incrs__[key] = self.__incrs__.get(key, 0) + val
             if field is not None:
+                self.__incrs__[key] = field.coerce(self.__incrs__[key], True)
                 for name in self.meta_.related_fields[key]:
-                    self.__cache__[name] = getattr(self, key)
+                    self.__cache__.setdefault(name, getattr(self, key))
                     if name != key:
                         self.__dirty__.add(name)
-                self.__dict__[key] = self.__incrs__[key]
+                self.__dict__[key] = self.cached_(key) + self.__incrs__[key]
             else:
-                self.__cache__[key] = getattr(self, key, 0)
-                self._overflow[key] = self.__incrs__[key]
+                self.__cache__.setdefault(key, getattr(self, key, 0))
+                self._overflow[key] = self.cached_(key) + self.__incrs__[key]
 
     def pre_save(self, engine):
         """ Called before saving items """
