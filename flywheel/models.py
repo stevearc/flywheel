@@ -5,8 +5,7 @@ import boto.dynamodb.types
 import contextlib
 import copy
 import inspect
-from boto.dynamodb2.fields import (HashKey, RangeKey, AllIndex, GlobalAllIndex,
-                                   BaseSchemaField)
+from boto.dynamodb2.fields import HashKey, RangeKey, BaseSchemaField
 from boto.dynamodb2.table import Table
 from boto.exception import JSONResponseError
 from collections import defaultdict
@@ -169,8 +168,9 @@ class ModelMetadata(object):
                                                    self.range_key))
         for field in self.fields.itervalues():
             if field.index:
-                self.orderings.append(self.__order_class__(self,
-                                                           self.hash_key, field, field.index))
+                order = self.__order_class__(self, self.hash_key, field,
+                                             field.index_name)
+                self.orderings.append(order)
 
         for index in self.global_indexes:
             for key in index:
@@ -381,12 +381,8 @@ class ModelMetadata(object):
                 f = RangeKey(name, data_type=field.ddb_data_type)
                 schema.append(f.schema())
             elif field.index:
-                if isinstance(field.index, basestring):
-                    index_name = field.index
-                else:
-                    index_name = '%s-index' % name
-                f = RangeKey(name, data_type=field.ddb_data_type)
-                idx = AllIndex(index_name, [hash_key, f])
+                idx = field.get_boto_index(hash_key)
+                f = idx.parts[1]
                 indexes.append(idx.schema())
             elif any(map(lambda x: name in x, self.global_indexes)):
                 f = BaseSchemaField(name, data_type=field.ddb_data_type)
@@ -396,20 +392,9 @@ class ModelMetadata(object):
             raw_attrs[name] = f
 
         for gindex in self.global_indexes:
-            hash_key = HashKey(gindex.hash_key,
-                               data_type=raw_attrs[gindex.hash_key].data_type)
-            parts = [hash_key]
-            if gindex.range_key is not None:
-                range_key = RangeKey(gindex.range_key,
-                                     data_type=raw_attrs[gindex.range_key]
-                                     .data_type)
-                parts.append(range_key)
+            index = gindex.get_boto_index(self.fields)
             if throughput is not None and gindex.name in throughput:
-                index_throughput = throughput[gindex.name]
-            else:
-                index_throughput = gindex.throughput
-            index = GlobalAllIndex(gindex.name, parts,
-                                   throughput=index_throughput)
+                index.throughput = throughput[gindex.name]
             global_indexes.append(index.schema())
 
         # Make sure indexes & global indexes either have data or are None

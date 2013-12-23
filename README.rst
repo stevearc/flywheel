@@ -85,9 +85,8 @@ installed.
 
 TODO
 ====
-* Indexes with different projections
+* Decimal data type (for currencies, etc)
 * Documentation
-* migration engine
 * Update boto Table.scan to take attributes=[] argument (for faster deletes)
 * Cross-table linking (One and Many)
 

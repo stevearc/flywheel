@@ -11,8 +11,7 @@ class Widget(Model):
     """ Test model with composite fields """
     __metadata__ = {
         'global_indexes': [
-            GlobalIndex('ts-index', 'userid', 'ts',
-                        throughput={'read': 1, 'write': 1}),
+            GlobalIndex('ts-index', 'userid', 'ts').throughput(1, 1)
         ],
         'throughput': {
             'read': 1,
@@ -414,15 +413,22 @@ class TestModelMutation(BaseSystemTest):
 
 
 class Store(Model):
+
     """ Test model for indexes """
     __metadata__ = {
         'global_indexes': [
-            GlobalIndex('name-index', 'name', 'city'),
+            GlobalIndex.all('name-index', 'name', 'city'),
+            GlobalIndex.keys('name-emp-index', 'name', 'num_employees'),
+            GlobalIndex.include('name-profit-index', 'name', 'monthly_profit',
+                                includes=['name', 'num_employees']),
         ],
     }
     city = Field(hash_key=True)
     name = Field(range_key=True)
-    sq_feet = Field(data_type=int, index='size-index')
+    sq_feet = Field(data_type=int).all_index('size-index')
+    num_employees = Field(data_type=int).keys_index('emp-index')
+    monthly_profit = Field(data_type=float)\
+        .include_index('profit-index', ['name', 'num_employees'])
 
 
 class TestCreate(BaseSystemTest):
@@ -435,25 +441,53 @@ class TestCreate(BaseSystemTest):
         Widget.meta_.namespace = ['test']
         Widget.meta_.delete_dynamo_schema(self.dynamo, wait=True)
 
-    def test_create_local_index(self):
-        """ Local secondary indexes are created """
+    def _get_index(self, name):
+        """ Get a specific index from the Store table """
         desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)['Table']
-        indexes = desc['LocalSecondaryIndexes']
-        self.assertEquals(len(indexes), 1)
-        index = indexes[0]
-        self.assertEquals(index['IndexName'], 'size-index')
+        for key in ('LocalSecondaryIndexes', 'GlobalSecondaryIndexes'):
+            indexes = desc[key]
+            for index in indexes:
+                if index['IndexName'] == name:
+                    return index
+
+    def test_create_local_all_index(self):
+        """ Create a local secondary ALL index """
+        index = self._get_index('size-index')
         projection = index['Projection']
         self.assertEquals(projection['ProjectionType'], 'ALL')
 
-    def test_create_global_index(self):
-        """ Global secondary indexes are created """
-        desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)['Table']
-        indexes = desc['GlobalSecondaryIndexes']
-        self.assertEquals(len(indexes), 1)
-        index = indexes[0]
-        self.assertEquals(index['IndexName'], 'name-index')
+    def test_create_local_keys_index(self):
+        """ Create a local secondary KEYS index """
+        index = self._get_index('emp-index')
+        projection = index['Projection']
+        self.assertEquals(projection['ProjectionType'], 'KEYS_ONLY')
+
+    def test_create_local_include_index(self):
+        """ Create a local secondary INCLUDE index """
+        index = self._get_index('profit-index')
+        projection = index['Projection']
+        self.assertEquals(projection['ProjectionType'], 'INCLUDE')
+        self.assertEquals(projection['NonKeyAttributes'],
+                          ['name', 'num_employees'])
+
+    def test_create_global_all_index(self):
+        """ Create a global secondary ALL index """
+        index = self._get_index('name-index')
         projection = index['Projection']
         self.assertEquals(projection['ProjectionType'], 'ALL')
+
+    def test_create_global_keys_index(self):
+        """ Create a global secondary KEYS index """
+        index = self._get_index('name-emp-index')
+        projection = index['Projection']
+        self.assertEquals(projection['ProjectionType'], 'KEYS_ONLY')
+
+    def test_create_global_include_index(self):
+        """ Create a global secondary INCLUDE index """
+        index = self._get_index('name-profit-index')
+        projection = index['Projection']
+        self.assertEquals(projection['NonKeyAttributes'],
+                          ['name', 'num_employees'])
 
     def test_model_throughput(self):
         """ Model defines the throughput """

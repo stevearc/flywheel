@@ -1,7 +1,11 @@
 """ Field declarations for models """
 from datetime import datetime, date
+
 import json
 from boto.dynamodb.types import Binary
+from boto.dynamodb2.fields import (HashKey, RangeKey, AllIndex, KeysOnlyIndex,
+                                   IncludeIndex, GlobalAllIndex,
+                                   GlobalKeysOnlyIndex, GlobalIncludeIndex)
 from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
                                   STRING_SET, BINARY_SET)
 from decimal import Decimal
@@ -26,11 +30,82 @@ class GlobalIndex(object):
 
     """
 
-    def __init__(self, name, hash_key, range_key=None, throughput=None):
+    def __init__(self, name, hash_key, range_key=None):
         self.name = name
         self.hash_key = hash_key
         self.range_key = range_key
-        self.throughput = throughput or {'read': 5, 'write': 5}
+        self._throughput = {'read': 5, 'write': 5}
+        self.boto_index = GlobalAllIndex
+        self.kwargs = {}
+
+    @classmethod
+    def all(cls, name, hash_key, range_key=None):
+        """ Project all attributes into the index """
+        return cls(name, hash_key, range_key)
+
+    @classmethod
+    def keys(cls, name, hash_key, range_key=None):
+        """ Project key attributes into the index """
+        index = cls(name, hash_key, range_key)
+        index.boto_index = GlobalKeysOnlyIndex
+        return index
+
+    @classmethod
+    def include(cls, name, hash_key, range_key=None, includes=None):
+        """ Select which attributes to project into the index """
+        includes = includes or []
+        index = cls(name, hash_key, range_key)
+        index.boto_index = GlobalIncludeIndex
+        index.kwargs['includes'] = includes
+        return index
+
+    def get_boto_index(self, fields):
+        """ Get the boto index class for this GlobalIndex """
+        hash_key = HashKey(self.hash_key,
+                           data_type=fields[self.hash_key].ddb_data_type)
+        parts = [hash_key]
+        if self.range_key is not None:
+            range_key = RangeKey(self.range_key,
+                                 data_type=fields[self.range_key].ddb_data_type)
+            parts.append(range_key)
+        index = self.boto_index(self.name, parts, **self.kwargs)
+        # Throughput has to be patched on afterwards due to bug in
+        # GlobalIncludeIndex
+        index.throughput = self._throughput
+        return index
+
+    def get_throughput(self):
+        """ Get the provisioned throughput """
+        return self._throughput
+
+    def throughput(self, read=5, write=5):
+        """
+        Set the index throughput
+
+        Parameters
+        ----------
+        read : int, optional
+            Amount of read throughput (default 5)
+        write : int, optional
+            Amount of write throughput (default 5)
+
+        Notes
+        -----
+        This is meant to be used as a chain::
+
+            class MyModel(Model):
+                __metadata__ = {
+                    'global_indexes': [
+                        GlobalIndex('myindex', 'hkey', 'rkey').throughput(5, 2)
+                    ]
+                }
+
+        """
+        self._throughput = {
+            'read': read,
+            'write': write,
+        }
+        return self
 
     def __contains__(self, field):
         return field == self.hash_key or field == self.range_key
@@ -252,13 +327,22 @@ class Field(object):
     composite : bool
         True if this is a composite field
 
+    Notes
+    -----
+    ::
+
+        Field(index='my-index')
+
+    Is shorthand for::
+
+        Field().all_index('my-index')
+
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
                  data_type=unicode, coerce=False, nullable=True, check=None):
-        if sum((hash_key, range_key, bool(index))) > 1:
-            raise TypeError("hash_key, range_key, and index are "
-                            "mutually exclusive!")
+        if sum((hash_key, range_key)) > 1:
+            raise ValueError("hash_key and range_key are mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
                              BINARY_SET, dict, bool, list, datetime, str,
                              unicode, int, float, set, date):
@@ -269,14 +353,78 @@ class Field(object):
         self.overflow = False
         self.data_type = data_type
         self._coerce = coerce
-        self.index = index
         self.nullable = nullable
         self.check = check
         self.hash_key = hash_key
         self.range_key = range_key
         self.subfields = []
+        self.index = False
+        self.index_name = None
+        self._boto_index = None
+        self._boto_index_kwargs = None
+        if index:
+            self.all_index(index)
         if hash_key or range_key:
             self.nullable = False
+
+    def get_boto_index(self, hash_key):
+        """ Construct a boto index object from a hash key """
+        parts = [hash_key, RangeKey(self.name, data_type=self.ddb_data_type)]
+        return self._boto_index(self.index_name, parts=parts,
+                                **self._boto_index_kwargs)
+
+    def _set_boto_index(self, name, boto_index, **kwargs):
+        """ Set the type of index """
+        if self.hash_key or self.range_key:
+            raise ValueError("Cannot index the hash or range key!")
+        if self.index:
+            raise ValueError("Index is already set!")
+        self.index_name = name
+        self._boto_index = boto_index
+        self._boto_index_kwargs = kwargs
+        self.index = True
+
+    def all_index(self, name):
+        """
+        Index this field and project all attributes
+
+        Parameters
+        ----------
+        name : str
+            The name of the index
+
+        """
+        self._set_boto_index(name, AllIndex)
+        return self
+
+    def keys_index(self, name):
+        """
+        Index this field and project all key attributes
+
+        Parameters
+        ----------
+        name : str
+            The name of the index
+
+        """
+        self._set_boto_index(name, KeysOnlyIndex)
+        return self
+
+    def include_index(self, name, includes=None):
+        """
+        Index this field and project selected attributes
+
+        Parameters
+        ----------
+        name : str
+            The name of the index
+        includes : list, optional
+            List of non-key attributes to project into this index
+
+        """
+        includes = includes or []
+        self._set_boto_index(name, IncludeIndex, includes=includes)
+        return self
 
     def coerce(self, value):
         """ Coerce the value to the field's data type """
