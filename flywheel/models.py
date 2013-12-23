@@ -666,12 +666,12 @@ class Model(object):
         self.__incrs__ = {}
         self._reset_cache()
 
-    def update(self, consistent=False):
+    def refresh(self, consistent=False):
         """ Overwrite model data with freshest from database """
         if self.__engine__ is None:
             raise ValueError("Cannot sync: No DB connection")
 
-        self.__engine__.update(self, consistent=consistent)
+        self.__engine__.refresh(self, consistent=consistent)
 
     def sync(self, atomic=False):
         """ Sync model changes back to database """

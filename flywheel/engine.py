@@ -485,7 +485,7 @@ class Engine(object):
                                          expected=expected)
                     item.post_save()
 
-    def update(self, items, consistent=False):
+    def refresh(self, items, consistent=False):
         """
         Overwrite model data with freshest from database
 
@@ -544,7 +544,7 @@ class Engine(object):
             atomic = self.default_atomic is not False
         if isinstance(items, Model):
             items = [items]
-        update_models = []
+        refresh_models = []
         for item in items:
             _atomic = atomic
             # Look for any mutable fields (e.g. sets) that have changed
@@ -557,7 +557,7 @@ class Engine(object):
                         item.__dirty__.add(name)
 
             if not item.__dirty__ and not item.__incrs__:
-                update_models.append(item)
+                refresh_models.append(item)
                 continue
             fields = item.__dirty__
             item.pre_save(self)
@@ -632,4 +632,4 @@ class Engine(object):
 
             item.post_save()
 
-        self.update(update_models, consistent=consistent)
+        self.refresh(refresh_models, consistent=consistent)

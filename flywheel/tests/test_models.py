@@ -285,14 +285,14 @@ class TestModelMutation(BaseSystemTest):
         with self.assertRaises(ConditionalCheckFailedException):
             p2.delete(atomic=True)
 
-    def test_update(self):
-        """ Updating model should refresh data """
+    def test_refresh(self):
+        """ Refreshing model should refresh data """
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
         p.ts = 10
         p.sync()
-        p2.update()
+        p2.refresh()
         self.assertEquals(p2.ts, p.ts)
 
     def test_atomic_sync(self):
