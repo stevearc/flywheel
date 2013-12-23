@@ -1,4 +1,5 @@
 """ Tests for models """
+import json
 from boto.dynamodb2.exceptions import ConditionalCheckFailedException
 
 from . import BaseSystemTest
@@ -64,8 +65,10 @@ class Article(Model):
     title = Field(hash_key=True)
     text = Field()
 
-    def __init__(self, title):
+    def __init__(self, title='Drugs win Drug War', **kwargs):
         self.title = title
+        for key, val in kwargs.iteritems():
+            setattr(self, key, val)
 
 
 class TestComposite(BaseSystemTest):
@@ -180,6 +183,54 @@ class TestModelMutation(BaseSystemTest):
 
     """ Tests for model mutation methods """
     models = [Post, Article]
+
+    def test_save(self):
+        """ Saving item puts it in the database """
+        a = Article()
+        self.engine.save(a)
+        table = a.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertEquals(result['title'], a.title)
+        self.assertIsNone(result.get('text'))
+
+    def test_save_conflict(self):
+        """ Saving a duplicate item will raise an exception """
+        a = Article(text='unfortunately')
+        self.engine.save(a)
+        a2 = Article(text='obviously')
+        with self.assertRaises(ConditionalCheckFailedException):
+            self.engine.save(a2)
+
+    def test_save_overwrite(self):
+        """ Saving a duplicate item with overwrite=True overwrites existing """
+        a = Article()
+        self.engine.save(a)
+        a2 = Article(text='obviously')
+        self.engine.save(a2, overwrite=True)
+        table = a.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertEquals(result['title'], a2.title)
+        self.assertEquals(result['text'], a2.text)
+
+    def test_overwrite_all_fields(self):
+        """ Save will clear existing, unspecified fields """
+        a = Article(alpha='hi')
+        self.engine.save(a)
+        a2 = Article(beta='ih')
+        self.engine.save(a2, overwrite=True)
+        table = a.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertEquals(result['title'], a2.title)
+        self.assertEquals(json.loads(result['beta']), a2.beta)
+        self.assertIsNone(result.get('alpha'))
+
+    def test_save_conflict_extra(self):
+        """ Save without overwrite raises error if unset fields differ """
+        a = Article(alpha='hi')
+        self.engine.save(a)
+        a2 = Article(beta='ih')
+        with self.assertRaises(ConditionalCheckFailedException):
+            self.engine.save(a2)
 
     def test_sync_new(self):
         """ Sync on a new item will create the item """

@@ -377,6 +377,20 @@ class Engine(object):
         overwrite : bool, optional
             If False, raise exception if item already exists (default False)
 
+        Raises
+        ------
+        exc : :class:`~boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+            If overwrite is False and an item already exists in the database
+
+        Notes
+        -----
+        Overwrite will replace the *entire* item with the new one, not just
+        different fields. After calling save(overwrite=True) you are guaranteed
+        that the item in the database is exactly the item you saved.
+
+        Due to the structure of the AWS API, saving with overwrite=True is much
+        faster because the requests can be batched.
+
         """
         if isinstance(items, Model):
             items = [items]
@@ -387,10 +401,23 @@ class Engine(object):
             tables[item.meta_.ddb_tablename].append(item)
         for tablename, items in tables.iteritems():
             table = Table(tablename, connection=self.dynamo)
-            with table.batch_write() as batch:
+            if overwrite:
+                with table.batch_write() as batch:
+                    for item in items:
+                        item.pre_save(self)
+                        batch.put_item(data=item.ddb_dump())
+                        item.post_save()
+            else:
                 for item in items:
+                    expected = {}
+                    for name in item.meta_.fields:
+                        expected[name] = {
+                            'Exists': False,
+                        }
                     item.pre_save(self)
-                    batch.put_item(data=item.ddb_dump(), overwrite=overwrite)
+                    boto_item = Item(table, data=item.ddb_dump())
+                    self.dynamo.put_item(tablename, boto_item.prepare_full(),
+                                         expected=expected)
                     item.post_save()
 
     def update(self, items, consistent=False):
