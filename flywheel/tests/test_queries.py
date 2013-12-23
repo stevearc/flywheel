@@ -351,3 +351,55 @@ class TestCompositeQueries(BaseSystemTest):
         with self.assertRaises(ValueError):
             self.engine(Post).filter(Post.username == 'a')\
                 .filter(Post.upvotes == 4).all()
+
+
+class Widget(Model):
+
+    """ Test model for ordering """
+    id = Field(hash_key=True)
+    name = Field(range_key=True)
+    alpha = Field(data_type=int, index='alpha-index')
+    beta = Field(data_type=int, index='beta-index')
+
+    def __init__(self, id=None, name=None, **kwargs):
+        self.id = id
+        self.name = name
+        for key, val in kwargs.iteritems():
+            setattr(self, key, val)
+
+
+class TestOrder(BaseSystemTest):
+
+    """ Test results ordering """
+    models = [Widget]
+
+    def _add_widgets(self):
+        """ Add a bunch of widgets with different alpha/beta values """
+        for i in xrange(10):
+            w = Widget('a', str(i))
+            w.alpha = i
+            w.beta = (i + 5) % 10
+            self.engine.save(w)
+
+    def test_default_acending(self):
+        """ By default results are in ascending order """
+        self._add_widgets()
+        items = self.engine(Widget).filter(id='a').index('alpha-index').all()
+        alpha = [item.alpha for item in items]
+        self.assertEquals(alpha, sorted(alpha))
+
+    def test_desc(self):
+        """ desc=True orders returns items in descending order """
+        self._add_widgets()
+        items = self.engine(Widget).filter(id='a')\
+            .index('alpha-index').all(desc=True)
+        alpha = [item.alpha for item in items]
+        alpha.reverse()
+        self.assertEquals(alpha, sorted(alpha))
+
+    def test_order_index(self):
+        """ Results are ordered by the index specified """
+        self._add_widgets()
+        items = self.engine(Widget).filter(id='a').index('beta-index').all()
+        beta = [item.beta for item in items]
+        self.assertEquals(beta, sorted(beta))

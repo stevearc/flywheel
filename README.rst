@@ -50,7 +50,7 @@ Get all top scores for a user::
 Get the top score for Galaxy Invaders::
 
     >>> top_score = engine.query(GameScore).filter(title='Galaxy Invaders')\
-    ...     .first(reverse=True)
+    ...     .first(desc=True)
 
 Safely increment the 'wins' count for Alien Adventure with no chance of
 failure::
@@ -86,10 +86,7 @@ installed.
 TODO
 ====
 * Documentation
+* Between filter
+* Track mutable overflow fields
 * Cross-table linking (One and Many)
-
-Notes
-=====
-* Syncing fields that are part of a composite field is ONLY safe if you use atomic. Otherwise your data could become corrupted
-* corrollary: if you use incr on a field that is part of an atomic field, it will FORCE the sync to be atomic
-* datetime types must be utc
+* Json serialization for sets, Decimals, etc

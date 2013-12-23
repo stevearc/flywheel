@@ -41,14 +41,14 @@ class Query(object):
         return Table(self.model.meta_.ddb_tablename,
                      connection=self.engine.dynamo)
 
-    def gen(self, reverse=False, consistent=False, attributes=None):
+    def gen(self, desc=False, consistent=False, attributes=None):
         """
         Return the query results as a generator
 
         Parameters
         ----------
-        reverse : bool, optional
-            Return results in reverse order (default False)
+        desc : bool, optional
+            Return results in descending order (default False)
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
@@ -59,6 +59,8 @@ class Query(object):
         kwargs = self.condition.query_kwargs(self.model)
         if attributes is not None:
             kwargs['attributes'] = attributes
+        kwargs['reverse'] = not desc
+        kwargs['consistent'] = consistent
         results = self.table.query(**kwargs)
         for result in results:
             if attributes is not None:
@@ -66,14 +68,14 @@ class Query(object):
             else:
                 yield self.model.ddb_load(self.engine, result)
 
-    def all(self, reverse=False, consistent=False, attributes=None):
+    def all(self, desc=False, consistent=False, attributes=None):
         """
         Return the query results as a list
 
         Parameters
         ----------
-        reverse : bool, optional
-            Return results in reverse order (default False)
+        desc : bool, optional
+            Return results in descending order (default False)
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
@@ -81,17 +83,17 @@ class Query(object):
             ResultItems instead of model objects.
 
         """
-        return list(self.gen(reverse=reverse, consistent=consistent,
+        return list(self.gen(desc=desc, consistent=consistent,
                              attributes=attributes))
 
-    def first(self, reverse=False, consistent=False, attributes=None):
+    def first(self, desc=False, consistent=False, attributes=None):
         """
         Return the first result of the query, or None if no results
 
         Parameters
         ----------
-        reverse : bool, optional
-            Return results in reverse order (default False)
+        desc : bool, optional
+            Return results in descending order (default False)
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
@@ -99,7 +101,7 @@ class Query(object):
             ResultItems instead of model objects.
 
         """
-        for result in self.gen(reverse=reverse, consistent=consistent,
+        for result in self.gen(desc=desc, consistent=consistent,
                                attributes=attributes):
             return result
         return None
@@ -116,6 +118,11 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns boto
             ResultItems instead of model objects.
+
+        Raises
+        ------
+        exc : ValueError
+            If there is not exactly one result
 
         """
         result = None
@@ -200,9 +207,9 @@ class Scan(Query):
 
     """
 
-    def gen(self, attributes=None, reverse=False, consistent=False):
-        if reverse:
-            raise ValueError("Cannot reverse scan() results")
+    def gen(self, attributes=None, desc=False, consistent=False):
+        if desc:
+            raise ValueError("Cannot order scan() results")
         if consistent:
             raise ValueError("Cannot force consistent read on scan()")
         kwargs = self.condition.scan_kwargs()
