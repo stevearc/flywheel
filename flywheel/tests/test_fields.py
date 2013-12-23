@@ -204,6 +204,14 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertTrue(stored_widget.wobbles is True)
 
+    def test_str(self):
+        """ Str type always converts value to bytestring """
+        w = PrimitiveWidget(string='a')
+        self.assertTrue(isinstance(w.string, str))
+        self.engine.save(w)
+        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        self.assertTrue(isinstance(stored_widget.string, str))
+
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
         w = PrimitiveWidget(string='a', created=datetime.utcnow())

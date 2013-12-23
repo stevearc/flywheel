@@ -85,6 +85,9 @@ installed.
 
 TODO
 ====
+* Add date field
+* Sync should be able to create blank objects (how does save(overwrite=True) work?)
+* Test index creation
 * Indexes with different projections
 * Documentation
 * migration engine

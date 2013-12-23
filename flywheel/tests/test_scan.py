@@ -1,6 +1,8 @@
 """ Tests for table scans """
+from datetime import datetime, timedelta
 from . import BaseSystemTest
 from .test_queries import User
+from flywheel import Model, Field
 
 
 class TestScan(BaseSystemTest):
@@ -251,3 +253,470 @@ class TestScanFilterOverflow(BaseSystemTest):
         results = self.engine.scan(User)\
             .filter(User.field_('foobar') != None).all()  # noqa
         self.assertEquals(results, [u])
+
+
+class Widget(Model):
+
+    """ Test model with every data type """
+    id = Field(hash_key=True)
+    school = Field(data_type=unicode)
+    count = Field(data_type=int)
+    score = Field(data_type=float)
+    isawesome = Field(data_type=bool)
+    name = Field(data_type=str)
+    friends = Field(data_type=set)
+    data = Field(data_type=dict)
+    queue = Field(data_type=list)
+    created = Field(data_type=datetime)
+
+    def __init__(self, **kwargs):
+        self.id = 'abc'
+        for key, val in kwargs.iteritems():
+            setattr(self, key, val)
+
+
+class TestFilterFields(BaseSystemTest):
+
+    """ Test query filters for every data type """
+    models = [Widget]
+
+    # UNICODE
+
+    def test_eq_unicode(self):
+        """ Can use equality filter on unicode fields """
+        w = Widget()
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.id == w.id).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_unicode(self):
+        """ Can use inequality filters on unicode fields """
+        w = Widget(school='Harvard')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.school < 'MIT').first()
+        self.assertEquals(w, ret)
+
+    def test_in_unicode(self):
+        """ Can use 'in' filter on unicode fields """
+        w = Widget()
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.id.in_([w.id])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_unicode(self):
+        """ Can use 'beginswith' filter on unicode fields """
+        w = Widget(id='abc')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.id.beginswith_('a')).first()
+        self.assertEquals(w, ret)
+
+    def test_contains_unicode(self):
+        """ Cannot use 'contains' filter on unicode fields """
+        w = Widget()
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.id.contains_(w.id)).all()
+
+    def test_ncontains_unicode(self):
+        """ Cannot use 'ncontains' filter on unicode fields """
+        w = Widget()
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.id.ncontains_(w.id)).all()
+
+    # STR
+
+    def test_eq_str(self):
+        """ Can use equality filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.name == 'dsa').first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_str(self):
+        """ Can use inequality filters on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.name > 'abc').first()
+        self.assertEquals(w, ret)
+
+    def test_in_str(self):
+        """ Can use 'in' filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.name.in_(['dsa'])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_str(self):
+        """ Can use 'beginswith' filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.name.beginswith_('d')).first()
+        self.assertEquals(w, ret)
+
+    def test_contains_str(self):
+        """ Cannot use 'contains' filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.name.contains_('dsa')).all()
+
+    def test_ncontains_str(self):
+        """ Cannot use 'ncontains' filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.name.ncontains_('dsa')).all()
+
+    # INT
+
+    def test_eq_int(self):
+        """ Can use equality filter on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count == 4).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_int(self):
+        """ Can use inequality filters on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count >= 4).first()
+        self.assertEquals(w, ret)
+
+    def test_in_int(self):
+        """ Can use 'in' filter on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count.in_([4])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_int(self):
+        """ Cannot use 'beginswith' filter on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.count.beginswith_(4)).all()
+
+    def test_contains_int(self):
+        """ Cannot use 'contains' filter on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.count.contains_(4)).all()
+
+    def test_ncontains_int(self):
+        """ Cannot use 'ncontains' filter on int fields """
+        w = Widget(count=4)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.count.ncontains_(4)).all()
+
+    # FLOAT
+
+    def test_eq_float(self):
+        """ Can use equality filter on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count == 1.3).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_float(self):
+        """ Can use inequality filters on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count < 2.3).first()
+        self.assertEquals(w, ret)
+
+    def test_in_float(self):
+        """ Can use 'in' filter on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.count.in_([1.3])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_float(self):
+        """ Cannot use 'beginswith' filter on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.count.beginswith_(1.3)).all()
+
+    def test_contains_float(self):
+        """ Cannot use 'contains' filter on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.count.contains_(1.3)).all()
+
+    def test_ncontains_float(self):
+        """ Cannot use 'ncontains' filter on float fields """
+        w = Widget(count=1.3)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.count.ncontains_(1.3)).all()
+
+    # BOOL
+
+    def test_eq_bool(self):
+        """ Can use equality filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+                .filter(Widget.isawesome == True).first()  # noqa
+        self.assertEquals(w, ret)
+
+    def test_ineq_bool(self):
+        """ Cannot use inequality filters on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.isawesome < True).all()
+
+    def test_in_bool(self):
+        """ Cannot use 'in' filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.isawesome.in_([True])).all()
+
+    def test_beginswith_bool(self):
+        """ Cannot use 'beginswith' filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.isawesome.beginswith_('T')).all()
+
+    def test_contains_bool(self):
+        """ Cannot use 'contains' filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.isawesome.contains_(True)).all()
+
+    def test_ncontains_bool(self):
+        """ Cannot use 'ncontains' filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.isawesome.ncontains_(True)).all()
+
+    # DATETIME
+
+    def test_eq_datetime(self):
+        """ Can use equality filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.created == n).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_datetime(self):
+        """ Can use inequality filters on datetime fields """
+        n = datetime.utcnow()
+        later = n + timedelta(seconds=1)
+        w = Widget(created=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.created < later).first()
+        self.assertEquals(w, ret)
+
+    def test_in_datetime(self):
+        """ Can use 'in' filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.created.in_([n])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_datetime(self):
+        """ Cannot use 'beginswith' filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.created.beginswith_(n)).all()
+
+    def test_contains_datetime(self):
+        """ Cannot use 'contains' filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.created.contains_(n)).all()
+
+    def test_ncontains_datetime(self):
+        """ Cannot use 'ncontains' filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.created.ncontains_(n)).all()
+
+    # SET
+
+    def test_eq_set(self):
+        """ Cannot use equality filter on set fields """
+        f = set(['a'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.friends == f).all()
+
+    def test_ineq_set(self):
+        """ Cannot use inequality filters on set fields """
+        f = set(['a'])
+        f2 = set(['a', 'b', 'c'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.friends < f2).all()
+
+    def test_in_set(self):
+        """ Cannot use 'in' filter on set fields """
+        f = set(['a'])
+        f2 = set(['a', 'b', 'c'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.friends.in_(f2)).all()
+
+    def test_beginswith_set(self):
+        """ Cannot use 'beginswith' filter on set fields """
+        f = set(['a'])
+        f2 = set(['a', 'b', 'c'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.friends.beginswith_(f2)).all()
+
+    def test_contains_set(self):
+        """ Can use 'contains' filter on set fields """
+        f = set(['a'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.friends.contains_('a')).first()
+        self.assertEquals(ret, w)
+
+    def test_ncontains_set(self):
+        """ Can use 'ncontains' filter on set fields """
+        f = set(['a'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.friends.ncontains_('b')).first()
+        self.assertEquals(ret, w)
+
+    # DICT
+
+    def test_eq_dict(self):
+        """ Cannot use equality filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data == d).all()
+
+    def test_ineq_dict(self):
+        """ Cannot use inequality filters on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data < d).all()
+
+    def test_in_dict(self):
+        """ Cannot use 'in' filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data.in_(d)).all()
+
+    def test_beginswith_dict(self):
+        """ Cannot use 'beginswith' filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data.beginswith_(d)).all()
+
+    def test_contains_dict(self):
+        """ Cannot use 'contains' filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data.contains_(d)).all()
+
+    def test_ncontains_dict(self):
+        """ Cannot use 'ncontains' filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data.ncontains_(d)).all()
+
+    # LIST
+
+    def test_eq_list(self):
+        """ Cannot use equality filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue == q).all()
+
+    def test_ineq_list(self):
+        """ Cannot use inequality filters on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue <= q).all()
+
+    def test_in_list(self):
+        """ Cannot use 'in' filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue.in_([q])).all()
+
+    def test_beginswith_list(self):
+        """ Cannot use 'beginswith' filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue.beginswith_(q)).all()
+
+    def test_contains_list(self):
+        """ Cannot use 'contains' filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue.contains_(q)).all()
+
+    def test_ncontains_list(self):
+        """ Cannot use 'ncontains' filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue.ncontains_(q)).all()

@@ -284,71 +284,71 @@ class Field(object):
             return value
         if self.data_type in (STRING, unicode):
             if not isinstance(value, unicode):
-                # Auto-convert str to unicode using utf-8
+                # Silently convert str to unicode using utf-8
                 if isinstance(value, str):
                     return value.decode('utf-8')
                 if self._coerce:
                     return unicode(value)
                 else:
-                    raise ValueError("Field '%s' must be a unicode string! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a unicode string! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == str:
             if not isinstance(value, str):
-                # Auto-convert unicode to str using utf-8
+                # Silently convert unicode to str using utf-8
                 if isinstance(value, unicode):
                     return value.encode('utf-8')
                 if self._coerce:
                     return str(value)
                 else:
-                    raise ValueError("Field '%s' must be a byte string! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a byte string! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type in (NUMBER, int, float):
             if not (isinstance(value, int) or isinstance(value, float) or
                     isinstance(value, Decimal)):
                 if self._coerce:
                     return Decimal(value)
                 else:
-                    raise ValueError("Field '%s' must be a number! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a number! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == BINARY:
             if not isinstance(value, Binary):
                 if self._coerce:
                     return Binary(value)
                 else:
-                    raise ValueError("Field '%s' must be a Binary! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a Binary! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             if not isinstance(value, set):
                 if self._coerce:
                     return set(value)
                 else:
-                    raise ValueError("Field '%s' must be a set! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a set! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == dict:
             if not isinstance(value, dict):
                 if self._coerce:
                     return dict(value)
                 else:
-                    raise ValueError("Field '%s' must be a dict! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a dict! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == list:
             if not isinstance(value, list):
                 if self._coerce:
                     return list(value)
                 else:
-                    raise ValueError("Field '%s' must be a list! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a list! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == bool:
             if not isinstance(value, bool):
                 if self._coerce:
                     return bool(value)
                 else:
-                    raise ValueError("Field '%s' must be a bool! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a bool! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type == datetime:
             if not isinstance(value, datetime):
-                raise ValueError("Field '%s' must be a datetime! %s" %
-                                 (self.name, repr(value)))
+                raise TypeError("Field '%s' must be a datetime! %s" %
+                                (self.name, repr(value)))
         return value
 
     @property
@@ -370,6 +370,24 @@ class Field(object):
         elif self.data_type == str:
             return value.decode('utf-8')
         return value
+
+    def ddb_dump_for_query(self, value):
+        """ Dump a value to format for use in a Dynamo query """
+        if value is None:
+            return None
+        if self.overflow:
+            return self.ddb_dump_overflow(value)
+        value = self.coerce(value)
+        if self.data_type in (dict, list):
+            raise TypeError("Cannot query on %s objects!" % self.data_type)
+        elif self.data_type == bool:
+            return int(value)
+        elif self.data_type == datetime:
+            return float(value.strftime('%s.%f'))
+        elif self.data_type == str:
+            return value.decode('utf-8')
+        else:
+            return value
 
     def ddb_load(self, val):
         """ Decode a value retrieved from Dynamo """
@@ -470,39 +488,59 @@ class Field(object):
             return scope[self.name]
 
     def __eq__(self, other):
-        if self.overflow:
-            other = self.ddb_dump_overflow(other)
+        other = self.ddb_dump_for_query(other)
+        if (other is not None and self.data_type in
+                (NUMBER_SET, STRING_SET, BINARY_SET, set)):
+            raise TypeError("Cannot use 'equality' filter on set field")
         return Condition.construct(self.name, 'eq', other)
 
     def __ne__(self, other):
-        if self.overflow:
-            other = self.ddb_dump_overflow(other)
+        other = self.ddb_dump_for_query(other)
+        if (other is not None and self.data_type in
+                (NUMBER_SET, STRING_SET, BINARY_SET, set)):
+            raise TypeError("Cannot use 'equality' filter on set field")
         return Condition.construct(self.name, 'ne', other)
 
     def __lt__(self, other):
+        if self.data_type in (bool, NUMBER_SET, STRING_SET, BINARY_SET, set):
+            raise TypeError("Cannot use 'inequality' filter on %s field" %
+                            self.data_type)
+        other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'lt', other)
 
     def __le__(self, other):
+        if self.data_type in (bool, NUMBER_SET, STRING_SET, BINARY_SET, set):
+            raise TypeError("Cannot use 'inequality' filter on %s field" %
+                            self.data_type)
+        other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'lte', other)
 
     def __gt__(self, other):
+        if self.data_type in (bool, NUMBER_SET, STRING_SET, BINARY_SET, set):
+            raise TypeError("Cannot use 'inequality' filter on %s field" %
+                            self.data_type)
+        other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'gt', other)
 
     def __ge__(self, other):
+        if self.data_type in (bool, NUMBER_SET, STRING_SET, BINARY_SET, set):
+            raise TypeError("Cannot use 'inequality' filter on %s field" %
+                            self.data_type)
+        other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'gte', other)
 
     def contains_(self, other):
         """ Create a query condition that this field must contain a value """
-        if (not self.overflow and
-                self.data_type not in (NUMBER_SET, STRING_SET, BINARY_SET)):
+        if (not self.overflow and self.data_type not in
+                (NUMBER_SET, STRING_SET, BINARY_SET, set)):
             raise TypeError("Field '%s' is not a set! Cannot use 'contains' "
                             "constraint." % self.name)
         return Condition.construct(self.name, 'contains', other)
 
     def ncontains_(self, other):
         """ Create a query condition that this field cannot contain a value """
-        if (not self.overflow and
-                self.data_type not in (NUMBER_SET, STRING_SET, BINARY_SET)):
+        if (not self.overflow and self.data_type not in
+                (NUMBER_SET, STRING_SET, BINARY_SET, set)):
             raise TypeError("Field '%s' is not a set! Cannot use 'ncontains' "
                             "constraint." % self.name)
         return Condition.construct(self.name, 'ncontains', other)
@@ -514,8 +552,11 @@ class Field(object):
         """
         if self.overflow:
             other = set([self.ddb_dump_overflow(val) for val in other])
-        elif not isinstance(other, set):
-            other = set(other)
+        elif self.data_type in (bool,):
+            raise TypeError("Cannot use 'in' filter on %s field" %
+                            self.data_type)
+        else:
+            other = set([self.ddb_dump_for_query(val) for val in other])
         return Condition.construct(self.name, 'in', other)
 
     def beginswith_(self, other):
