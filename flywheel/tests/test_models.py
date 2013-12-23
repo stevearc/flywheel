@@ -362,14 +362,14 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(p.ts, 9.5)
 
     def test_incr_decimal(self):
-        """ Increment works on floats """
+        """ Increment works on Decimals """
         p = Post('a', 'b', 0)
         p.points = Decimal('1.5')
         self.engine.save(p)
         p.incr_(points=2)
-        self.assertEquals(p.points, 3.5)
+        self.assertEquals(p.points, Decimal('3.5'))
         p.sync()
-        self.assertEquals(p.points, 3.5)
+        self.assertEquals(p.points, Decimal('3.5'))
         self.assertTrue(isinstance(p.points, Decimal))
 
     def test_incr_atomic(self):
