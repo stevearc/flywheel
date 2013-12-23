@@ -199,7 +199,7 @@ class TestModelMutation(BaseSystemTest):
         self.engine.save(a)
         a2 = Article(text='obviously')
         with self.assertRaises(ConditionalCheckFailedException):
-            self.engine.save(a2)
+            self.engine.save(a2, overwrite=False)
 
     def test_save_overwrite(self):
         """ Saving a duplicate item with overwrite=True overwrites existing """
@@ -230,7 +230,7 @@ class TestModelMutation(BaseSystemTest):
         self.engine.save(a)
         a2 = Article(beta='ih')
         with self.assertRaises(ConditionalCheckFailedException):
-            self.engine.save(a2)
+            self.engine.save(a2, overwrite=False)
 
     def test_sync_new(self):
         """ Sync on a new item will create the item """

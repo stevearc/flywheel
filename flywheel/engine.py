@@ -231,6 +231,8 @@ class Engine(object):
     dynamo : :class:`boto.dynamodb2.DynamoDBConnection`, optional
     namespace : list, optional
         List of namespace component strings for models
+    default_atomic : {True, False, 'update'}, optional
+        Default setting for delete(), save(), and sync() (default 'update')
 
     Notes
     -----
@@ -275,13 +277,47 @@ class Engine(object):
         prince = engine.scan(User).filter(User.field_('bio').beginswith_(
                    'Now this is a story all about how')).first()
 
+    The default_atomic setting configures the behavior of save(), sync(), and
+    delete(). Below is an explanation of the different values of
+    default_atomic.
+
+    **'update'**
+    * save - overwrite defaults to True
+    * sync - atomic defaults to True
+    * delete - atomic defaults to False
+
+    **True**
+    * save - overwrite defaults to False
+    * sync - atomic defaults to True
+    * delete - atomic defaults to True
+
+    **False**
+    * save - overwrite defaults to True
+    * sync - atomic defaults to False
+    * delete - atomic defaults to False
+
     """
 
-    def __init__(self, dynamo=None, namespace=None):
+    def __init__(self, dynamo=None, namespace=None, default_atomic='update'):
         self.dynamo = dynamo
         self.models = {}
         self.namespace = namespace or []
         ModelMetadata.namespace = self.namespace
+        self._default_atomic = None
+        self.default_atomic = default_atomic
+
+    @property
+    def default_atomic(self):
+        """ Get the default_atomic value """
+        return self._default_atomic
+
+    @default_atomic.setter
+    def default_atomic(self, default_atomic):
+        """ Protected setter for default_atomic """
+        if default_atomic not in (True, False, 'update'):
+            raise ValueError("Unrecognized value '%s' for default_atomic" %
+                             default_atomic)
+        self._default_atomic = default_atomic
 
     def connect_to_region(self, region, **kwargs):
         """ Connect to an AWS region """
@@ -340,7 +376,7 @@ class Engine(object):
         """ Create a table scan for a specific model """
         return Scan(self, model)
 
-    def delete(self, items, atomic=False):
+    def delete(self, items, atomic=None):
         """
         Delete items from dynamo
 
@@ -350,7 +386,7 @@ class Engine(object):
             List of :class:`~flywheel.models.Model` objects to delete
         atomic : bool, optional
             If True, raise exception if the object has changed out from under
-            us (default False)
+            us (default set by default_atomic)
 
         Raises
         ------
@@ -363,6 +399,8 @@ class Engine(object):
         faster because the requests can be batched.
 
         """
+        if atomic is None:
+            atomic = self.default_atomic is True
         if isinstance(items, Model):
             items = [items]
         if not items:
@@ -391,7 +429,7 @@ class Engine(object):
                     for item in items:
                         batch.delete_item(**item.pk_dict_)
 
-    def save(self, items, overwrite=False):
+    def save(self, items, overwrite=None):
         """
         Save models to dynamo
 
@@ -399,7 +437,8 @@ class Engine(object):
         ----------
         items : list or :class:`~flywheel.models.Model`
         overwrite : bool, optional
-            If False, raise exception if item already exists (default False)
+            If False, raise exception if item already exists (default set by
+            default_atomic)
 
         Raises
         ------
@@ -416,6 +455,8 @@ class Engine(object):
         faster because the requests can be batched.
 
         """
+        if overwrite is None:
+            overwrite = self.default_atomic is not True
         if isinstance(items, Model):
             items = [items]
         if not items:
@@ -475,7 +516,7 @@ class Engine(object):
                     for key, val in data.items():
                         item.set_ddb_val(key, val)
 
-    def sync(self, items, atomic=True, consistent=False):
+    def sync(self, items, atomic=None, consistent=False):
         """
         Sync model changes back to database
 
@@ -488,7 +529,7 @@ class Engine(object):
             Models to sync
         atomic : bool, optional
             If True, raise exception if the object has changed out from under
-            us (default True)
+            us (default set by default_atomic)
         consistent : bool, optional
             If True, force a consistent read from the db. This will only take
             effect if the sync is only performing a read. (default False)
@@ -499,6 +540,8 @@ class Engine(object):
             If atomic=True and the model changed underneath us
 
         """
+        if atomic is None:
+            atomic = self.default_atomic is not False
         if isinstance(items, Model):
             items = [items]
         update_models = []
