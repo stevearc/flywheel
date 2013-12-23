@@ -59,18 +59,6 @@ class Post(Model):
         self.about = about
 
 
-class Article(Model):
-
-    """ Super simple test model """
-    title = Field(hash_key=True)
-    text = Field()
-
-    def __init__(self, title='Drugs win Drug War', **kwargs):
-        self.title = title
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
-
-
 class TestComposite(BaseSystemTest):
 
     """ Tests for composite fields """
@@ -136,47 +124,16 @@ class TestComposite(BaseSystemTest):
         self.assertEquals(results[0]['score'], 6)
 
 
-class TestThroughput(BaseSystemTest):
+class Article(Model):
 
-    """ Test model throughput settings """
+    """ Super simple test model """
+    title = Field(hash_key=True)
+    text = Field()
 
-    def tearDown(self):
-        super(TestThroughput, self).tearDown()
-        Widget.meta_.namespace = ['test']
-        Widget.meta_.delete_dynamo_schema(self.dynamo, wait=True)
-
-    def test_model_throughput(self):
-        """ Model defines the throughput """
-        Widget.meta_.create_dynamo_schema(self.dynamo, wait=True)
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)
-        throughput = desc['Table']['ProvisionedThroughput']
-        self.assertEquals(throughput['ReadCapacityUnits'], 1)
-        self.assertEquals(throughput['WriteCapacityUnits'], 1)
-        global_indexes = desc['Table']['GlobalSecondaryIndexes']
-        for index in global_indexes:
-            throughput = index['ProvisionedThroughput']
-            self.assertEquals(throughput['ReadCapacityUnits'], 1)
-            self.assertEquals(throughput['WriteCapacityUnits'], 1)
-
-    def test_override_throughput(self):
-        """ Throughput can be overridden in the create call """
-        Widget.meta_.create_dynamo_schema(self.dynamo, wait=True, throughput={
-            'read': 3,
-            'write': 3,
-            'ts-index': {
-                'read': 3,
-                'write': 3,
-            },
-        })
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)
-        throughput = desc['Table']['ProvisionedThroughput']
-        self.assertEquals(throughput['ReadCapacityUnits'], 3)
-        self.assertEquals(throughput['WriteCapacityUnits'], 3)
-        global_indexes = desc['Table']['GlobalSecondaryIndexes']
-        for index in global_indexes:
-            throughput = index['ProvisionedThroughput']
-            self.assertEquals(throughput['ReadCapacityUnits'], 3)
-            self.assertEquals(throughput['WriteCapacityUnits'], 3)
+    def __init__(self, title='Drugs win Drug War', **kwargs):
+        self.title = title
+        for key, val in kwargs.iteritems():
+            setattr(self, key, val)
 
 
 class TestModelMutation(BaseSystemTest):
@@ -454,3 +411,79 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
+
+
+class Store(Model):
+    """ Test model for indexes """
+    __metadata__ = {
+        'global_indexes': [
+            GlobalIndex('name-index', 'name', 'city'),
+        ],
+    }
+    city = Field(hash_key=True)
+    name = Field(range_key=True)
+    sq_feet = Field(data_type=int, index='size-index')
+
+
+class TestCreate(BaseSystemTest):
+
+    """ Test model throughput settings """
+    models = [Store]
+
+    def tearDown(self):
+        super(TestCreate, self).tearDown()
+        Widget.meta_.namespace = ['test']
+        Widget.meta_.delete_dynamo_schema(self.dynamo, wait=True)
+
+    def test_create_local_index(self):
+        """ Local secondary indexes are created """
+        desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)['Table']
+        indexes = desc['LocalSecondaryIndexes']
+        self.assertEquals(len(indexes), 1)
+        index = indexes[0]
+        self.assertEquals(index['IndexName'], 'size-index')
+        projection = index['Projection']
+        self.assertEquals(projection['ProjectionType'], 'ALL')
+
+    def test_create_global_index(self):
+        """ Global secondary indexes are created """
+        desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)['Table']
+        indexes = desc['GlobalSecondaryIndexes']
+        self.assertEquals(len(indexes), 1)
+        index = indexes[0]
+        self.assertEquals(index['IndexName'], 'name-index')
+        projection = index['Projection']
+        self.assertEquals(projection['ProjectionType'], 'ALL')
+
+    def test_model_throughput(self):
+        """ Model defines the throughput """
+        Widget.meta_.create_dynamo_schema(self.dynamo, wait=True)
+        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)['Table']
+        throughput = desc['ProvisionedThroughput']
+        self.assertEquals(throughput['ReadCapacityUnits'], 1)
+        self.assertEquals(throughput['WriteCapacityUnits'], 1)
+        global_indexes = desc['GlobalSecondaryIndexes']
+        for index in global_indexes:
+            throughput = index['ProvisionedThroughput']
+            self.assertEquals(throughput['ReadCapacityUnits'], 1)
+            self.assertEquals(throughput['WriteCapacityUnits'], 1)
+
+    def test_override_throughput(self):
+        """ Throughput can be overridden in the create call """
+        Widget.meta_.create_dynamo_schema(self.dynamo, wait=True, throughput={
+            'read': 3,
+            'write': 3,
+            'ts-index': {
+                'read': 3,
+                'write': 3,
+            },
+        })
+        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)['Table']
+        throughput = desc['ProvisionedThroughput']
+        self.assertEquals(throughput['ReadCapacityUnits'], 3)
+        self.assertEquals(throughput['WriteCapacityUnits'], 3)
+        global_indexes = desc['GlobalSecondaryIndexes']
+        for index in global_indexes:
+            throughput = index['ProvisionedThroughput']
+            self.assertEquals(throughput['ReadCapacityUnits'], 3)
+            self.assertEquals(throughput['WriteCapacityUnits'], 3)

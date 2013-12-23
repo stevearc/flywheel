@@ -28,7 +28,7 @@ API documentation
         userid = Field(hash_key=True)
         title = Field(range_key=True)
         top_score = Field(data_type=int)
-        top_score_time = Field()
+        top_score_time = Field(date_type=datetime)
         wins = Field(data_type=int)
         losses = Field(data_type=int)
 
@@ -40,7 +40,7 @@ Create a new top score::
 
     >>> score = GameScore('Master Blaster', 'abc')
     >>> score.top_score = 9001
-    >>> score.top_score_time = datetime.utcnow().isoformat()
+    >>> score.top_score_time = datetime.utcnow()
     >>> engine.sync(score)
 
 Get all top scores for a user::
@@ -85,7 +85,6 @@ installed.
 
 TODO
 ====
-* Test index creation
 * Indexes with different projections
 * Documentation
 * migration engine

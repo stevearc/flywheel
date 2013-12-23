@@ -381,7 +381,10 @@ class ModelMetadata(object):
                 f = RangeKey(name, data_type=field.ddb_data_type)
                 schema.append(f.schema())
             elif field.index:
-                index_name = '%s-index' % name
+                if isinstance(field.index, basestring):
+                    index_name = field.index
+                else:
+                    index_name = '%s-index' % name
                 f = RangeKey(name, data_type=field.ddb_data_type)
                 idx = AllIndex(index_name, [hash_key, f])
                 indexes.append(idx.schema())
