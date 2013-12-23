@@ -85,9 +85,7 @@ installed.
 
 TODO
 ====
-* Decimal data type (for currencies, etc)
 * Documentation
-* Update boto Table.scan to take attributes=[] argument (for faster deletes)
 * Cross-table linking (One and Many)
 
 Notes

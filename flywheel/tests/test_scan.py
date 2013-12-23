@@ -1,5 +1,8 @@
 """ Tests for table scans """
 from datetime import datetime, date, timedelta
+
+from decimal import Decimal
+
 from . import BaseSystemTest
 from .test_queries import User
 from flywheel import Model, Field
@@ -269,6 +272,7 @@ class Widget(Model):
     queue = Field(data_type=list)
     created = Field(data_type=datetime)
     birthday = Field(data_type=date)
+    price = Field(data_type=Decimal)
 
     def __init__(self, **kwargs):
         self.id = 'abc'
@@ -421,48 +425,97 @@ class TestFilterFields(BaseSystemTest):
 
     def test_eq_float(self):
         """ Can use equality filter on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
-        ret = self.engine.scan(Widget).filter(Widget.count == 1.3).first()
+        ret = self.engine.scan(Widget).filter(Widget.score == 1.3).first()
         self.assertEquals(w, ret)
 
     def test_ineq_float(self):
         """ Can use inequality filters on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
-        ret = self.engine.scan(Widget).filter(Widget.count < 2.3).first()
+        ret = self.engine.scan(Widget).filter(Widget.score < 2.3).first()
         self.assertEquals(w, ret)
 
     def test_in_float(self):
         """ Can use 'in' filter on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
-        ret = self.engine.scan(Widget).filter(Widget.count.in_([1.3])).first()
+        ret = self.engine.scan(Widget).filter(Widget.score.in_([1.3])).first()
         self.assertEquals(w, ret)
 
     def test_beginswith_float(self):
         """ Cannot use 'beginswith' filter on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
-                .filter(Widget.count.beginswith_(1.3)).all()
+                .filter(Widget.score.beginswith_(1.3)).all()
 
     def test_contains_float(self):
         """ Cannot use 'contains' filter on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
-                .filter(Widget.count.contains_(1.3)).all()
+                .filter(Widget.score.contains_(1.3)).all()
 
     def test_ncontains_float(self):
         """ Cannot use 'ncontains' filter on float fields """
-        w = Widget(count=1.3)
+        w = Widget(score=1.3)
         self.engine.save(w)
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
-                .filter(Widget.count.ncontains_(1.3)).all()
+                .filter(Widget.score.ncontains_(1.3)).all()
+
+    # DECIMAL
+
+    def test_eq_decimal(self):
+        """ Can use equality filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.price ==
+                                              Decimal('3.50')).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_decimal(self):
+        """ Can use inequality filters on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.price > 2.3).first()
+        self.assertEquals(w, ret)
+
+    def test_in_decimal(self):
+        """ Can use 'in' filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.price.in_([Decimal('3.50')])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_decimal(self):
+        """ Cannot use 'beginswith' filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.price.beginswith_(Decimal('3.50'))).all()
+
+    def test_contains_decimal(self):
+        """ Cannot use 'contains' filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.price.contains_(Decimal('3.50'))).all()
+
+    def test_ncontains_decimal(self):
+        """ Cannot use 'ncontains' filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.price.ncontains_(Decimal('3.50'))).all()
 
     # BOOL
 
@@ -698,7 +751,7 @@ class TestFilterFields(BaseSystemTest):
         d = {'foo': 'bar'}
         w = Widget(data=d)
         self.engine.save(w)
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             self.engine.scan(Widget).filter(Widget.data.in_(d)).all()
 
     def test_beginswith_dict(self):

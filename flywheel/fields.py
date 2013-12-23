@@ -345,7 +345,7 @@ class Field(object):
             raise ValueError("hash_key and range_key are mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
                              BINARY_SET, dict, bool, list, datetime, str,
-                             unicode, int, float, set, date):
+                             unicode, int, float, set, date, Decimal):
             raise TypeError("Unknown data type '%s'" % data_type)
         self.name = None
         self.model = None
@@ -426,16 +426,18 @@ class Field(object):
         self._set_boto_index(name, IncludeIndex, includes=includes)
         return self
 
-    def coerce(self, value):
+    def coerce(self, value, force_coerce=None):
         """ Coerce the value to the field's data type """
         if value is None:
             return value
+        if force_coerce is None:
+            force_coerce = self._coerce
         if self.data_type in (STRING, unicode):
             if not isinstance(value, unicode):
                 # Silently convert str to unicode using utf-8
                 if isinstance(value, str):
                     return value.decode('utf-8')
-                if self._coerce:
+                if force_coerce:
                     return unicode(value)
                 else:
                     raise TypeError("Field '%s' must be a unicode string! %s" %
@@ -445,50 +447,66 @@ class Field(object):
                 # Silently convert unicode to str using utf-8
                 if isinstance(value, unicode):
                     return value.encode('utf-8')
-                if self._coerce:
+                if force_coerce:
                     return str(value)
                 else:
                     raise TypeError("Field '%s' must be a byte string! %s" %
                                     (self.name, repr(value)))
-        elif self.data_type in (NUMBER, int, float):
+        elif self.data_type == int:
+            if not isinstance(value, int):
+                if force_coerce:
+                    return Decimal(value)
+                else:
+                    raise TypeError("Field '%s' must be an int! %s" %
+                                    (self.name, repr(value)))
+        elif self.data_type in (NUMBER, float):
             if not (isinstance(value, int) or isinstance(value, float) or
                     isinstance(value, Decimal)):
-                if self._coerce:
+                if force_coerce:
                     return Decimal(value)
                 else:
                     raise TypeError("Field '%s' must be a number! %s" %
                                     (self.name, repr(value)))
+        elif self.data_type == Decimal:
+            if not isinstance(value, Decimal):
+                if force_coerce:
+                    return Decimal(value)
+                else:
+                    import traceback
+                    traceback.print_stack()
+                    return TypeError("Field '%s' must be a Decimal! %s" %
+                                     (self.name, repr(value)))
         elif self.data_type == BINARY:
             if not isinstance(value, Binary):
-                if self._coerce:
+                if force_coerce:
                     return Binary(value)
                 else:
                     raise TypeError("Field '%s' must be a Binary! %s" %
                                     (self.name, repr(value)))
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             if not isinstance(value, set):
-                if self._coerce:
+                if force_coerce:
                     return set(value)
                 else:
                     raise TypeError("Field '%s' must be a set! %s" %
                                     (self.name, repr(value)))
         elif self.data_type == dict:
             if not isinstance(value, dict):
-                if self._coerce:
+                if force_coerce:
                     return dict(value)
                 else:
                     raise TypeError("Field '%s' must be a dict! %s" %
                                     (self.name, repr(value)))
         elif self.data_type == list:
             if not isinstance(value, list):
-                if self._coerce:
+                if force_coerce:
                     return list(value)
                 else:
                     raise TypeError("Field '%s' must be a list! %s" %
                                     (self.name, repr(value)))
         elif self.data_type == bool:
             if not isinstance(value, bool):
-                if self._coerce:
+                if force_coerce:
                     return bool(value)
                 else:
                     raise TypeError("Field '%s' must be a bool! %s" %
@@ -531,7 +549,7 @@ class Field(object):
             return None
         if self.overflow:
             return self.ddb_dump_overflow(value)
-        value = self.coerce(value)
+        value = self.coerce(value, force_coerce=True)
         if self.data_type in (dict, list):
             raise TypeError("Cannot query on %s objects!" % self.data_type)
         elif self.data_type == bool:
@@ -547,7 +565,7 @@ class Field(object):
 
     def ddb_load(self, val):
         """ Decode a value retrieved from Dynamo """
-        if isinstance(val, Decimal):
+        if self.data_type != Decimal and isinstance(val, Decimal):
             if val % 1 == 0:
                 val = int(val)
             else:
@@ -594,6 +612,8 @@ class Field(object):
             return None
         elif self.data_type in (NUMBER, int, float):
             return 0
+        elif self.data_type == Decimal:
+            return Decimal('0')
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             return set()
         elif self.data_type == dict:
@@ -606,7 +626,7 @@ class Field(object):
     @property
     def ddb_data_type(self):
         """ Get the DynamoDB data type as used by boto """
-        if self.data_type in (int, float, bool, datetime, date):
+        if self.data_type in (int, float, bool, datetime, date, Decimal):
             return NUMBER
         elif self.data_type in (str, unicode, list, dict):
             return STRING

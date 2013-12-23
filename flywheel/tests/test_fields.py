@@ -1,6 +1,8 @@
 """ Tests for fields """
-from datetime import datetime
+from datetime import datetime, date
+
 import json
+from decimal import Decimal
 
 from . import BaseSystemTest
 from flywheel import (Field, Model, NUMBER, BINARY, STRING_SET, NUMBER_SET,
@@ -162,7 +164,9 @@ class PrimitiveWidget(Model):
     data = Field(data_type=dict)
     friends = Field(data_type=list)
     created = Field(data_type=datetime)
+    birthday = Field(data_type=date)
     wobbles = Field(data_type=bool)
+    price = Field(data_type=Decimal)
 
     def __init__(self, **kwargs):
         self.string = 'abc'
@@ -187,6 +191,9 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         self.assertEquals(w.wobbles, False)
         self.assertEquals(w.friends, [])
         self.assertIsNone(w.created)
+        self.assertIsNone(w.birthday)
+        self.assertEquals(w.price, 0)
+        self.assertTrue(isinstance(w.price, Decimal))
 
     def test_dict_updates(self):
         """ Dicts track changes and update during sync() """
@@ -218,6 +225,21 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         self.engine.sync(w)
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertEquals(w.created, stored_widget.created)
+
+    def test_date(self):
+        """ Can store date & it gets returned as date """
+        w = PrimitiveWidget(string='a', birthday=date.today())
+        self.engine.sync(w)
+        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        self.assertEquals(w.birthday, stored_widget.birthday)
+
+    def test_decimal(self):
+        """ Can store decimal & it gets returned as decimal """
+        w = PrimitiveWidget(string='a', price=Decimal('3.50'))
+        self.engine.sync(w)
+        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        self.assertEquals(w.price, stored_widget.price)
+        self.assertTrue(isinstance(stored_widget.price, Decimal))
 
     def test_list_updates(self):
         """ Lists track changes and update during sync() """
