@@ -612,6 +612,10 @@ class Model(object):
             pk[self.meta_.range_key.name] = self.rk_
         return pk
 
+    def keys_(self):
+        """ All declared fields and any additional fields """
+        return self.meta_.fields.keys() + self._overflow.keys()
+
     def cached_(self, name):
         """ Get the cached (server) value of a field """
         if not self.persisted_:
@@ -662,6 +666,13 @@ class Model(object):
         self.__incrs__ = {}
         self._reset_cache()
 
+    def update(self, consistent=False):
+        """ Overwrite model data with freshest from database """
+        if self.__engine__ is None:
+            raise ValueError("Cannot sync: No DB connection")
+
+        self.__engine__.update(self, consistent=consistent)
+
     def sync(self, atomic=False):
         """ Sync model changes back to database """
         if self.__engine__ is None:
@@ -669,11 +680,11 @@ class Model(object):
 
         self.__engine__.sync(self, atomic=atomic)
 
-    def delete(self):
+    def delete(self, atomic=False):
         """ Delete the model from the database """
         if self.__engine__ is None:
             raise ValueError("Cannot delete: No DB connection")
-        self.__engine__.delete(self)
+        self.__engine__.delete(self, atomic=atomic)
 
     def post_load(self, engine):
         """ Called after model loaded from database """

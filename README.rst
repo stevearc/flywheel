@@ -85,7 +85,6 @@ installed.
 
 TODO
 ====
-* Atomic delete
 * Sync should be able to create blank objects
 * Test index creation
 * Indexes with different projections

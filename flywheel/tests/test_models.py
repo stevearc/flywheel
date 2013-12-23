@@ -267,6 +267,34 @@ class TestModelMutation(BaseSystemTest):
         results = self.engine.scan(Post).all()
         self.assertEquals(results, [])
 
+    def test_atomic_delete(self):
+        """ Atomic delete should delete item if no conflicts """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p.delete(atomic=True)
+        results = self.engine.scan(Post).all()
+        self.assertEquals(results, [])
+
+    def test_atomic_delete_conflict(self):
+        """ Atomic delete should raise exception on conflict """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p.ts = 10
+        p.sync()
+        with self.assertRaises(ConditionalCheckFailedException):
+            p2.delete(atomic=True)
+
+    def test_update(self):
+        """ Updating model should refresh data """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p.ts = 10
+        p.sync()
+        p2.update()
+        self.assertEquals(p2.ts, p.ts)
+
     def test_atomic_sync(self):
         """ Atomic sync used normally just syncs object """
         p = Post('a', 'b', 4)

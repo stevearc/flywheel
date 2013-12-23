@@ -340,7 +340,7 @@ class Engine(object):
         """ Create a table scan for a specific model """
         return Scan(self, model)
 
-    def delete(self, items):
+    def delete(self, items, atomic=False):
         """
         Delete items from dynamo
 
@@ -348,6 +348,19 @@ class Engine(object):
         ----------
         items : list or :class:`~flywheel.model.Model`
             List of :class:`~flywheel.models.Model` objects to delete
+        atomic : bool, optional
+            If True, raise exception if the object has changed out from under
+            us (default False)
+
+        Raises
+        ------
+        exc : :class:`~boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+            If overwrite is False and an item already exists in the database
+
+        Notes
+        -----
+        Due to the structure of the AWS API, deleting with atomic=False is much
+        faster because the requests can be batched.
 
         """
         if isinstance(items, Model):
@@ -359,13 +372,24 @@ class Engine(object):
             tables[item.meta_.ddb_tablename].append(item)
 
         for tablename, items in tables.iteritems():
-            table = Table(tablename, connection=self.dynamo)
-            with table.batch_write() as batch:
+            if atomic:
                 for item in items:
-                    kwargs = {item.meta_.hash_key.name: item.hk_}
-                    if item.meta_.range_key is not None:
-                        kwargs[item.meta_.range_key.name] = item.rk_
-                    batch.delete_item(**kwargs)
+                    expected = {}
+                    for name in item.keys_():
+                        val = getattr(item, name)
+                        exists = val is not None
+                        expected[name] = {
+                            'Exists': exists,
+                        }
+                        if exists:
+                            expected[name]['Value'] = DYNAMIZER.encode(val)
+                    self.dynamo.delete_item(tablename, item.pk_dict_,
+                                            expected=expected)
+            else:
+                table = Table(tablename, connection=self.dynamo)
+                with table.batch_write() as batch:
+                    for item in items:
+                        batch.delete_item(**item.pk_dict_)
 
     def save(self, items, overwrite=False):
         """
