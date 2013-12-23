@@ -1,5 +1,5 @@
 """ Tests for table scans """
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from . import BaseSystemTest
 from .test_queries import User
 from flywheel import Model, Field
@@ -268,6 +268,7 @@ class Widget(Model):
     data = Field(data_type=dict)
     queue = Field(data_type=list)
     created = Field(data_type=datetime)
+    birthday = Field(data_type=date)
 
     def __init__(self, **kwargs):
         self.id = 'abc'
@@ -564,6 +565,59 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
                 .filter(Widget.created.ncontains_(n)).all()
+
+    # DATE
+
+    def test_eq_date(self):
+        """ Can use equality filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.birthday == n).first()
+        self.assertEquals(w, ret)
+
+    def test_ineq_date(self):
+        """ Can use inequality filters on date fields """
+        n = date.today()
+        later = n + timedelta(days=1)
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.birthday < later).first()
+        self.assertEquals(w, ret)
+
+    def test_in_date(self):
+        """ Can use 'in' filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget).filter(Widget.birthday.in_([n])).first()
+        self.assertEquals(w, ret)
+
+    def test_beginswith_date(self):
+        """ Cannot use 'beginswith' filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.birthday.beginswith_(n)).all()
+
+    def test_contains_date(self):
+        """ Cannot use 'contains' filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.birthday.contains_(n)).all()
+
+    def test_ncontains_date(self):
+        """ Cannot use 'ncontains' filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.birthday.ncontains_(n)).all()
 
     # SET
 

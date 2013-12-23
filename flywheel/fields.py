@@ -1,5 +1,5 @@
 """ Field declarations for models """
-from datetime import datetime
+from datetime import datetime, date
 import json
 from boto.dynamodb.types import Binary
 from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
@@ -261,7 +261,7 @@ class Field(object):
                             "mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
                              BINARY_SET, dict, bool, list, datetime, str,
-                             unicode, int, float, set):
+                             unicode, int, float, set, date):
             raise TypeError("Unknown data type '%s'" % data_type)
         self.name = None
         self.model = None
@@ -349,6 +349,10 @@ class Field(object):
             if not isinstance(value, datetime):
                 raise TypeError("Field '%s' must be a datetime! %s" %
                                 (self.name, repr(value)))
+        elif self.data_type == date:
+            if not isinstance(value, date):
+                raise TypeError("Field '%s' must be a date! %s" %
+                                (self.name, repr(value)))
         return value
 
     @property
@@ -367,6 +371,8 @@ class Field(object):
             return int(value)
         elif self.data_type == datetime:
             return float(value.strftime('%s.%f'))
+        elif self.data_type == date:
+            return int(value.strftime('%s'))
         elif self.data_type == str:
             return value.decode('utf-8')
         return value
@@ -384,6 +390,8 @@ class Field(object):
             return int(value)
         elif self.data_type == datetime:
             return float(value.strftime('%s.%f'))
+        elif self.data_type == date:
+            return int(value.strftime('%s'))
         elif self.data_type == str:
             return value.decode('utf-8')
         else:
@@ -402,6 +410,8 @@ class Field(object):
             return bool(val)
         elif self.data_type == datetime:
             return datetime.fromtimestamp(val)
+        elif self.data_type == date:
+            return date.fromtimestamp(val)
         elif self.data_type == str:
             return val.encode('utf-8')
         return val
@@ -448,7 +458,7 @@ class Field(object):
     @property
     def ddb_data_type(self):
         """ Get the DynamoDB data type as used by boto """
-        if self.data_type in (int, float, bool, datetime):
+        if self.data_type in (int, float, bool, datetime, date):
             return NUMBER
         elif self.data_type in (str, unicode, list, dict):
             return STRING
