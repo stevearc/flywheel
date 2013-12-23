@@ -435,8 +435,9 @@ class TestModelMutation(BaseSystemTest):
         self.engine.save(p)
         p.incr_(likes=4)
         p.sync()
-        result = self.engine.scan(Post).first(attributes=['score', 'likes',
-                                                          'ts'])
+
+        table = p.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
@@ -447,8 +448,9 @@ class TestModelMutation(BaseSystemTest):
         self.engine.save(p)
         p.incr_(likes=4)
         p.sync(atomic=True)
-        result = self.engine.scan(Post).first(attributes=['score', 'likes',
-                                                          'ts'])
+
+        table = p.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)

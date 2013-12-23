@@ -138,22 +138,21 @@ class Query(object):
         self.condition &= Condition.construct_index(name)
         return self
 
-    def delete(self):
+    def delete(self, atomic=None):
         """ Delete all items that match the query """
-        count = 0
-        meta = self.model.meta_
-        with self.table.batch_write() as batch:
+        if atomic is None:
+            atomic = self.engine.default_atomic is True
+
+        if atomic:
+            results = self.gen()
+        else:
+            meta = self.model.meta_
             attrs = [meta.hash_key.name]
             if meta.range_key is not None:
                 attrs.append(meta.range_key.name)
-            for result in self.gen(attributes=attrs):
-                # Pull out just the hash and range key from the item
-                kwargs = {meta.hash_key.name: result[meta.hash_key.name]}
-                if meta.range_key is not None:
-                    kwargs[meta.range_key.name] = result[meta.range_key.name]
-                count += 1
-                batch.delete_item(**kwargs)
-        return count
+            results = self.gen(attributes=attrs)
+        return self.engine._delete_items(self.model.meta_.ddb_tablename,
+                                         results, atomic)
 
     def filter(self, *conditions, **kwargs):
         """
@@ -207,10 +206,13 @@ class Scan(Query):
         if consistent:
             raise ValueError("Cannot force consistent read on scan()")
         kwargs = self.condition.scan_kwargs()
-        # TODO: uncomment this line to make scan deletes more efficient once
+
+        # TODO: delete this line to make scan deletes more efficient once
         # boto API supports passing 'attributes' to Table.scan()
-        # if attributes is not None:
-        #    kwargs['attributes'] = attributes
+        attributes = None
+
+        if attributes is not None:
+            kwargs['attributes'] = attributes
         results = self.table.scan(**kwargs)
         for result in results:
             if attributes is not None:
@@ -411,24 +413,36 @@ class Engine(object):
             tables[item.meta_.ddb_tablename].append(item)
 
         for tablename, items in tables.iteritems():
-            if atomic:
+            self._delete_items(tablename, items, atomic)
+
+    def _delete_items(self, tablename, items, atomic):
+        """ Delete items from a single table """
+        count = 0
+        if atomic:
+            for item in items:
+                expected = {}
+                for name in item.keys_():
+                    val = getattr(item, name)
+                    exists = val is not None
+                    expected[name] = {
+                        'Exists': exists,
+                    }
+                    if exists:
+                        expected[name]['Value'] = DYNAMIZER.encode(val)
+                count += 1
+                self.dynamo.delete_item(tablename, item.pk_dict_,
+                                        expected=expected)
+        else:
+            table = Table(tablename, connection=self.dynamo)
+            with table.batch_write() as batch:
                 for item in items:
-                    expected = {}
-                    for name in item.keys_():
-                        val = getattr(item, name)
-                        exists = val is not None
-                        expected[name] = {
-                            'Exists': exists,
-                        }
-                        if exists:
-                            expected[name]['Value'] = DYNAMIZER.encode(val)
-                    self.dynamo.delete_item(tablename, item.pk_dict_,
-                                            expected=expected)
-            else:
-                table = Table(tablename, connection=self.dynamo)
-                with table.batch_write() as batch:
-                    for item in items:
-                        batch.delete_item(**item.pk_dict_)
+                    if isinstance(item, Model):
+                        keys = item.pk_dict_
+                    else:
+                        keys = dict(item)
+                    count += 1
+                    batch.delete_item(**keys)
+        return count
 
     def save(self, items, overwrite=None):
         """
