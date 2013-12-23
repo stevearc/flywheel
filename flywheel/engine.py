@@ -2,6 +2,7 @@
 import itertools
 
 from boto.dynamodb2 import connect_to_region
+from boto.dynamodb2.exceptions import ConditionalCheckFailedException
 from boto.dynamodb2.items import Item
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.types import Dynamizer
@@ -632,4 +633,14 @@ class Engine(object):
 
             item.post_save()
 
+        # Handle items that didn't have any fields to update
+
+        # If the item isn't known to exist in the db, try to save it first
+        for item in refresh_models:
+            if not item.persisted_:
+                try:
+                    self.save(item, overwrite=False)
+                except ConditionalCheckFailedException:
+                    pass
+        # Refresh item data
         self.refresh(refresh_models, consistent=consistent)

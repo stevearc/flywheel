@@ -85,7 +85,6 @@ installed.
 
 TODO
 ====
-* Sync should be able to create blank objects
 * Test index creation
 * Indexes with different projections
 * Documentation

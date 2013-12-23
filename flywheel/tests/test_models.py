@@ -295,6 +295,18 @@ class TestModelMutation(BaseSystemTest):
         p2.refresh()
         self.assertEquals(p2.ts, p.ts)
 
+    def test_sync_blank(self):
+        """ Sync creates item even if only primary key is set """
+        a = Article()
+        self.engine.sync(a)
+        table = a.meta_.ddb_table(self.dynamo)
+        results = list(table.scan())
+        self.assertEquals(len(results), 1)
+        result = dict(results[0])
+        self.assertEquals(result, {
+            'title': a.title,
+        })
+
     def test_atomic_sync(self):
         """ Atomic sync used normally just syncs object """
         p = Post('a', 'b', 4)
