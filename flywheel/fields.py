@@ -2,7 +2,7 @@
 from datetime import datetime, date
 
 import json
-from boto.dynamodb.types import Binary
+from boto.dynamodb.types import Binary, float_to_decimal
 from boto.dynamodb2.fields import (HashKey, RangeKey, AllIndex, KeysOnlyIndex,
                                    IncludeIndex, GlobalAllIndex,
                                    GlobalKeysOnlyIndex, GlobalIncludeIndex)
@@ -470,10 +470,12 @@ class Field(object):
         elif self.data_type == Decimal:
             if not isinstance(value, Decimal):
                 if force_coerce:
+                    # Python 2.6 can't convert directly from float to Decimal
+                    if (isinstance(value, float) and
+                            not hasattr(Decimal, 'from_float')):
+                        return float_to_decimal(value)
                     return Decimal(value)
                 else:
-                    import traceback
-                    traceback.print_stack()
                     return TypeError("Field '%s' must be a Decimal! %s" %
                                      (self.name, repr(value)))
         elif self.data_type == BINARY:

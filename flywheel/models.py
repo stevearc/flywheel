@@ -1,7 +1,6 @@
 """ Model code """
 import time
 
-import boto.dynamodb.types
 import contextlib
 import copy
 import inspect
@@ -9,24 +8,8 @@ from boto.dynamodb2.fields import HashKey, RangeKey, BaseSchemaField
 from boto.dynamodb2.table import Table
 from boto.exception import JSONResponseError
 from collections import defaultdict
-from decimal import Inexact, Rounded, Decimal
 
 from .fields import Field, NUMBER
-
-
-# HACK to force conversion of floats to Decimals
-boto.dynamodb.types.DYNAMODB_CONTEXT.traps[Inexact] = False
-boto.dynamodb.types.DYNAMODB_CONTEXT.traps[Rounded] = False
-
-
-def float_to_decimal(f):
-    """ Monkey-patched replacement for boto's broken version """
-    n, d = f.as_integer_ratio()
-    numerator, denominator = Decimal(n), Decimal(d)
-    ctx = boto.dynamodb.types.DYNAMODB_CONTEXT
-    return ctx.divide(numerator, denominator)
-
-boto.dynamodb.types.float_to_decimal = float_to_decimal
 
 
 class ValidationError(Exception):
