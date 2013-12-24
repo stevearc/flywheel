@@ -1,4 +1,5 @@
 """ Tests for fields """
+import os
 from datetime import datetime, date
 
 import json
@@ -224,11 +225,12 @@ class TestPrimitiveDataTypes(BaseSystemTest):
 
     def test_str(self):
         """ Str type always converts value to bytestring """
-        w = PrimitiveWidget(string='a')
+        w = PrimitiveWidget(string=os.urandom(10))
         self.assertTrue(isinstance(w.string, str))
         self.engine.save(w)
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertTrue(isinstance(stored_widget.string, str))
+        self.assertEquals(stored_widget.string, w.string)
 
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """

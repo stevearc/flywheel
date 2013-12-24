@@ -8,7 +8,7 @@ from boto.dynamodb2.table import Table
 from boto.dynamodb2.types import Dynamizer
 from collections import defaultdict
 
-from .fields import Condition
+from .fields import Field, Condition
 from .models import Model, ModelMetadata
 
 
@@ -652,12 +652,18 @@ class Engine(object):
                     expect = {
                         'Exists': cache_val is not None,
                     }
+                    field = item.meta_.fields.get(name)
+                    if field is not None:
+                        cache_val = field.ddb_dump(cache_val)
+                    else:
+                        cache_val = Field.ddb_dump_overflow(cache_val)
                     if expect['Exists']:
                         expect['Value'] = DYNAMIZER.encode(cache_val)
                     expected[name] = expect
 
             # Atomic increment fields
             for name, value in item.__incrs__.iteritems():
+                # We don't need to ddb_dump because we know they're all numbers
                 data[name] = {'Action': 'ADD'}
                 data[name]['Value'] = DYNAMIZER.encode(value)
                 if _atomic:
@@ -669,9 +675,8 @@ class Engine(object):
                         expect['Value'] = DYNAMIZER.encode(cache_val)
                     expected[name] = expect
 
-            key = {item.meta_.hash_key.name: DYNAMIZER.encode(item.hk_)}
-            if item.meta_.range_key is not None:
-                key[item.meta_.range_key.name] = DYNAMIZER.encode(item.rk_)
+            key = dict([(k, DYNAMIZER.encode(v)) for k, v in
+                        item.pk_dict_.iteritems()])
 
             # Perform sync
             ret = self.dynamo.update_item(item.meta_.ddb_tablename, key, data,

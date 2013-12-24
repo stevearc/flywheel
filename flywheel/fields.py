@@ -438,7 +438,7 @@ class Field(object):
                 else:
                     raise TypeError("Field '%s' must be a unicode string! %s" %
                                     (self.name, repr(value)))
-        elif self.data_type == str:
+        elif self.data_type in (str, BINARY):
             if not isinstance(value, str):
                 # Silently convert unicode to str using utf-8
                 if isinstance(value, unicode):
@@ -480,13 +480,6 @@ class Field(object):
                 else:
                     return TypeError("Field '%s' must be a Decimal! %s" %
                                      (self.name, repr(value)))
-        elif self.data_type == BINARY:
-            if not isinstance(value, Binary):
-                if force_coerce:
-                    return Binary(value)
-                else:
-                    raise TypeError("Field '%s' must be a Binary! %s" %
-                                    (self.name, repr(value)))
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             if not isinstance(value, set):
                 if force_coerce:
@@ -543,8 +536,8 @@ class Field(object):
             return float(value.strftime('%s.%f'))
         elif self.data_type == date:
             return int(value.strftime('%s'))
-        elif self.data_type == str:
-            return value.decode('utf-8')
+        elif self.data_type in (str, BINARY):
+            return Binary(value)
         return value
 
     def ddb_dump_for_query(self, value):
@@ -556,16 +549,7 @@ class Field(object):
         value = self.coerce(value, force_coerce=True)
         if self.data_type in (dict, list):
             raise TypeError("Cannot query on %s objects!" % self.data_type)
-        elif self.data_type == bool:
-            return int(value)
-        elif self.data_type == datetime:
-            return float(value.strftime('%s.%f'))
-        elif self.data_type == date:
-            return int(value.strftime('%s'))
-        elif self.data_type == str:
-            return value.decode('utf-8')
-        else:
-            return value
+        return self.ddb_dump(value)
 
     def ddb_load(self, val):
         """ Decode a value retrieved from Dynamo """
@@ -582,8 +566,8 @@ class Field(object):
             return datetime.fromtimestamp(val)
         elif self.data_type == date:
             return date.fromtimestamp(val)
-        elif self.data_type == str:
-            return val.encode('utf-8')
+        elif self.data_type in (str, BINARY):
+            return val.value
         return val
 
     @classmethod
@@ -632,8 +616,10 @@ class Field(object):
         """ Get the DynamoDB data type as used by boto """
         if self.data_type in (int, float, bool, datetime, date, Decimal):
             return NUMBER
-        elif self.data_type in (str, unicode, list, dict):
+        elif self.data_type in (unicode, list, dict):
             return STRING
+        elif self.data_type == str:
+            return BINARY
         return self.data_type
 
     def can_resolve(self, fields):
@@ -748,9 +734,11 @@ class Field(object):
         """
         if self.overflow:
             other = '"' + other
-        elif self.data_type not in (STRING, str, unicode):
+        elif self.data_type not in (STRING, BINARY, str, unicode):
             raise TypeError("Field '%s' is not a string! Cannot use "
                             "'beginswith' constraint." % self.name)
+        else:
+            other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'beginswith', other)
 
 

@@ -579,10 +579,12 @@ class Model(object):
     @property
     def pk_dict_(self):
         """ The primary key dict """
-        pk = {self.meta_.hash_key.name: self.hk_}
-        if self.meta_.range_key is not None:
-            pk[self.meta_.range_key.name] = self.rk_
-        return pk
+        key = {}
+        for field in (self.meta_.hash_key, self.meta_.range_key):
+            if field is None:
+                continue
+            key[field.name] = field.ddb_dump(field.resolve(self))
+        return key
 
     def keys_(self):
         """ All declared fields and any additional fields """
