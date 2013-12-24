@@ -145,21 +145,15 @@ class Query(object):
         self.condition &= Condition.construct_index(name)
         return self
 
-    def delete(self, atomic=None):
+    def delete(self):
         """ Delete all items that match the query """
-        if atomic is None:
-            atomic = self.engine.default_atomic is True
-
-        if atomic:
-            results = self.gen()
-        else:
-            meta = self.model.meta_
-            attrs = [meta.hash_key.name]
-            if meta.range_key is not None:
-                attrs.append(meta.range_key.name)
-            results = self.gen(attributes=attrs)
+        meta = self.model.meta_
+        attrs = [meta.hash_key.name]
+        if meta.range_key is not None:
+            attrs.append(meta.range_key.name)
+        results = self.gen(attributes=attrs)
         return self.engine._delete_items(self.model.meta_.ddb_tablename,
-                                         results, atomic)
+                                         results, atomic=False)
 
     def filter(self, *conditions, **kwargs):
         """
@@ -167,16 +161,24 @@ class Query(object):
 
         Notes
         -----
-        The conditions may be passed in as positional arguments::
+        The conditions may be passed in as positional arguments:
+
+        .. code-block:: python
 
             engine.query(User).filter(User.id == 12345)
 
-        Or they may be passed in as keyword arguments::
+        Or they may be passed in as keyword arguments:
+
+        .. code-block:: python
 
             engine.query(User).filter(firstname='Monty', lastname='Python')
 
         The limitations of the keyword method is that you may only create
-        equality conditions.
+        equality conditions. You may use both types in a single filter:
+
+        .. code-block:: python
+
+            engine.query(User).filter(User.num_friends > 10, name='Monty')
 
         """
         for condition in conditions:
@@ -247,7 +249,9 @@ class Engine(object):
     Notes
     -----
     The engine is used to save, sync, delete, and query DynamoDB. Here is a
-    basic example of saving items::
+    basic example of saving items:
+
+    .. code-block:: python
 
         item1 = MyModel()
         engine.save(item1)
@@ -255,26 +259,26 @@ class Engine(object):
         item2 = MyModel()
         engine.save([item1, item2], overwrite=True)
 
-    You can also use the engine to query tables::
+    You can also use the engine to query tables:
+
+    .. code-block:: python
 
         user = engine.query(User).filter(User.id == 'abcdef).first()
 
         # calling engine() is a shortcut for engine.query()
         user = engine(User).filter(User.id == 'abcdef).first()
 
-        d_users = engine(User).filter(User.school == 'MIT')\
-                .filter(User.name.beginswith_('D')).all()
-
-        # You can use logical and to join filter conditions
-        d_users = engine(User).filter((User.school == 'MIT') &
-                                            (User.name.beginswith_('D'))).all()
+        d_users = engine(User).filter(User.school == 'MIT',
+                                      User.name.beginswith_('D')).all()
 
         # You can pass in equality constraints as keyword args
         user = engine(User).filter(id='abcdef').first()
 
     Scans are like queries, except that they don't use an index. Scans iterate
     over the ENTIRE TABLE so they are REALLY SLOW. Scans have access to
-    additional filter conditions such as "contains" and "in"::
+    additional filter conditions such as "contains" and "in".
+
+    .. code-block:: python
 
         # This is suuuuuper slow!
         user = engine.scan(User).filter(id='abcdef').first()
@@ -286,25 +290,6 @@ class Engine(object):
         # to filter a field not specified in the model declaration:
         prince = engine.scan(User).filter(User.field_('bio').beginswith_(
                    'Now this is a story all about how')).first()
-
-    The default_atomic setting configures the behavior of save(), sync(), and
-    delete(). Below is an explanation of the different values of
-    default_atomic.
-
-    **'update'**
-    * save - overwrite defaults to True
-    * sync - atomic defaults to True
-    * delete - atomic defaults to False
-
-    **True**
-    * save - overwrite defaults to False
-    * sync - atomic defaults to True
-    * delete - atomic defaults to True
-
-    **False**
-    * save - overwrite defaults to True
-    * sync - atomic defaults to False
-    * delete - atomic defaults to False
 
     """
 
@@ -318,7 +303,44 @@ class Engine(object):
 
     @property
     def default_atomic(self):
-        """ Get the default_atomic value """
+        """
+        Get the default_atomic value
+
+        Notes
+        -----
+        The default_atomic setting configures the behavior of save(), sync(), and
+        delete(). Below is an explanation of the different values of
+        default_atomic.
+
+        +----------------+--------+-----------------+
+        | default_atomic | method | default         |
+        +================+========+=================+
+        |**'update'**    |        |                 |
+        +----------------+--------+-----------------+
+        |                | save   | overwrite=True  |
+        +----------------+--------+-----------------+
+        |                | sync   | atomic=True     |
+        +----------------+--------+-----------------+
+        |                | delete | atomic=False    |
+        +----------------+--------+-----------------+
+        |**True**        |        |                 |
+        +----------------+--------+-----------------+
+        |                | save   | overwrite=False |
+        +----------------+--------+-----------------+
+        |                | sync   | atomic=True     |
+        +----------------+--------+-----------------+
+        |                | delete | atomic=True     |
+        +----------------+--------+-----------------+
+        |**False**       |        |                 |
+        +----------------+--------+-----------------+
+        |                | save   | overwrite=True  |
+        +----------------+--------+-----------------+
+        |                | sync   | atomic=False    |
+        +----------------+--------+-----------------+
+        |                | delete | atomic=False    |
+        +----------------+--------+-----------------+
+
+        """
         return self._default_atomic
 
     @default_atomic.setter
@@ -379,11 +401,25 @@ class Engine(object):
         return self.query(model)
 
     def query(self, model):
-        """ Create a table query for a specific model """
+        """
+        Create a table query for a specific model
+
+        Returns
+        -------
+        query : :class:`.Query`
+
+        """
         return Query(self, model)
 
     def scan(self, model):
-        """ Create a table scan for a specific model """
+        """
+        Create a table scan for a specific model
+
+        Returns
+        -------
+        scan : :class:`.Scan`
+
+        """
         return Scan(self, model)
 
     def delete(self, items, atomic=None):
@@ -396,11 +432,11 @@ class Engine(object):
             List of :class:`~flywheel.models.Model` objects to delete
         atomic : bool, optional
             If True, raise exception if the object has changed out from under
-            us (default set by default_atomic)
+            us (default set by :attr:`.default_atomic`)
 
         Raises
         ------
-        exc : :class:`~boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
             If overwrite is False and an item already exists in the database
 
         Notes
@@ -460,11 +496,11 @@ class Engine(object):
         items : list or :class:`~flywheel.models.Model`
         overwrite : bool, optional
             If False, raise exception if item already exists (default set by
-            default_atomic)
+            :attr:`.default_atomic`)
 
         Raises
         ------
-        exc : :class:`~boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
             If overwrite is False and an item already exists in the database
 
         Notes
@@ -516,8 +552,7 @@ class Engine(object):
         items : list or :class:`~flywheel.models.Model`
             Models to sync
         consistent : bool, optional
-            If True, force a consistent read from the db. This will only take
-            effect if the sync is only performing a read. (default False)
+            If True, force a consistent read from the db. (default False)
 
         """
         if isinstance(items, Model):
@@ -551,14 +586,14 @@ class Engine(object):
             Models to sync
         atomic : bool, optional
             If True, raise exception if the object has changed out from under
-            us (default set by default_atomic)
+            us (default set by :attr:`.default_atomic`)
         consistent : bool, optional
             If True, force a consistent read from the db. This will only take
             effect if the sync is only performing a read. (default False)
 
         Raises
         ------
-        exc : :class:`~boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
             If atomic=True and the model changed underneath us
 
         """
