@@ -283,6 +283,17 @@ class TestQueries(BaseSystemTest):
             .filter(User.score > 75).all()
         self.assertEquals(results, [u2])
 
+    def test_double_limit(self):
+        """ Calling limit twice on the same query raises error """
+        with self.assertRaises(ValueError):
+            self.engine.query(User).filter(name='Adam').limit(10).limit(5).all()
+
+    def test_double_index(self):
+        """ Calling index twice on the same query raises error """
+        with self.assertRaises(ValueError):
+            self.engine.query(User).filter(name='Adam').index('name-index')\
+                .index('score-index').all()
+
 
 class TestCompositeQueries(BaseSystemTest):
 
@@ -390,8 +401,7 @@ class TestOrder(BaseSystemTest):
     def _add_widgets(self):
         """ Add a bunch of widgets with different alpha/beta values """
         for i in xrange(10):
-            w = Widget('a', str(i))
-            w.alpha = i
+            w = Widget('a', str(i), alpha=i)
             w.beta = (i + 5) % 10
             self.engine.save(w)
 

@@ -88,5 +88,5 @@ TODO
 ====
 * Track mutable overflow fields
 * atomic add to sets
-* Cross-table linking (One and Many)
 * Link to S3 for storing large items
+* Cross-table linking (One and Many)

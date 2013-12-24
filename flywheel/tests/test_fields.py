@@ -10,6 +10,12 @@ from flywheel import (Field, Model, NUMBER, BINARY, STRING_SET, NUMBER_SET,
                       BINARY_SET, GlobalIndex)
 
 
+try:
+    import unittest2 as unittest  # pylint: disable=F0401
+except ImportError:
+    import unittest
+
+
 class Widget(Model):
 
     """ Model for testing default field values """
@@ -30,6 +36,188 @@ class Widget(Model):
         self.string = 'abc'
         for key, val in kwargs.iteritems():
             setattr(self, key, val)
+
+
+class TestCreateFields(unittest.TestCase):
+
+    """ Tests related to the creation of Fields """
+
+    def test_hash_and_range(self):
+        """ A field cannot be both a hash_key and range_key """
+        with self.assertRaises(ValueError):
+            Field(hash_key=True, range_key=True)
+
+    def test_unknown_data_type(self):
+        """ Unknown data types are disallowed by Field """
+        with self.assertRaises(TypeError):
+            Field(data_type=basestring)
+
+    def test_double_index(self):
+        """ Field cannot be indexed twice """
+        with self.assertRaises(ValueError):
+            Field(index='ts-index').all_index('name-index')
+
+    def test_index_hash_key(self):
+        """ Cannot index the hash key """
+        with self.assertRaises(ValueError):
+            Field(hash_key=True, index='h-index')
+
+    def test_index_range_key(self):
+        """ Cannot index the range key """
+        with self.assertRaises(ValueError):
+            Field(range_key=True, index='r-index')
+
+
+class TestFieldCoerce(unittest.TestCase):
+
+    """ Tests Field type coercion """
+
+    def test_always_coerce_str_unicode(self):
+        """ Always coerce str to unicode """
+        field = Field(data_type=unicode)
+        ret = field.coerce(b'val')
+        self.assertTrue(isinstance(ret, unicode))
+
+    def test_coerce_unicode(self):
+        """ Coerce to unicode """
+        field = Field(data_type=unicode, coerce=True)
+        ret = field.coerce(5)
+        self.assertTrue(isinstance(ret, unicode))
+
+    def test_coerce_unicode_fail(self):
+        """ Coerce to unicode fails if coerce=False """
+        field = Field(data_type=unicode)
+        with self.assertRaises(TypeError):
+            field.coerce(5)
+
+    def test_always_coerce_unicode_str(self):
+        """ Always coerce unicode to str """
+        field = Field(data_type=str)
+        ret = field.coerce(u'val')
+        self.assertTrue(isinstance(ret, str))
+
+    def test_coerce_str(self):
+        """ Coerce to str """
+        field = Field(data_type=str, coerce=True)
+        ret = field.coerce(5)
+        self.assertTrue(isinstance(ret, str))
+
+    def test_coerce_str_fail(self):
+        """ Coerce to str fails if coerce=False """
+        field = Field(data_type=str)
+        with self.assertRaises(TypeError):
+            field.coerce(5)
+
+    def test_int_no_data_loss(self):
+        """ Int fields refuse to drop floating point data """
+        field = Field(data_type=int, coerce=True)
+        with self.assertRaises(ValueError):
+            field.coerce(4.5)
+        with self.assertRaises(ValueError):
+            field.coerce(Decimal('4.5'))
+
+    def test_int_coerce(self):
+        """ Int fields can coerce floats """
+        field = Field(data_type=int, coerce=True)
+        ret = field.coerce(4.0)
+        self.assertEquals(ret, 4)
+        self.assertTrue(isinstance(ret, int))
+
+    def test_int_coerce_fail(self):
+        """ Coerce to int fails if coerce=False """
+        field = Field(data_type=int)
+        with self.assertRaises(TypeError):
+            field.coerce(4.0)
+
+    def test_coerce_float(self):
+        """ Coerce to float """
+        field = Field(data_type=float, coerce=True)
+        ret = field.coerce('4.3')
+        self.assertTrue(isinstance(ret, float))
+
+    def test_always_coerce_int_float(self):
+        """ Always coerce ints to float """
+        field = Field(data_type=float)
+        ret = field.coerce(5)
+        self.assertTrue(isinstance(ret, float))
+
+    def test_coerce_float_fail(self):
+        """ Coerce to float fails if coerce=False """
+        field = Field(data_type=float)
+        with self.assertRaises(TypeError):
+            field.coerce('4.3')
+
+    def test_coerce_decimal(self):
+        """ Coerce to Decimal """
+        field = Field(data_type=Decimal, coerce=True)
+        ret = field.coerce(5.5)
+        self.assertTrue(isinstance(ret, Decimal))
+
+    def test_coerce_decimal_fail(self):
+        """ Coerce to Decimal fails if coerce=False """
+        field = Field(data_type=Decimal)
+        with self.assertRaises(TypeError):
+            field.coerce(5.5)
+
+    def test_coerce_set(self):
+        """ Coerce to set """
+        field = Field(data_type=set, coerce=True)
+        ret = field.coerce([1, 2])
+        self.assertTrue(isinstance(ret, set))
+
+    def test_coerce_set_fail(self):
+        """ Coerce to set fails if coerce=False """
+        field = Field(data_type=set)
+        with self.assertRaises(TypeError):
+            field.coerce([1, 2])
+
+    def test_coerce_dict(self):
+        """ Coerce to dict """
+        field = Field(data_type=dict, coerce=True)
+        ret = field.coerce([(1, 2)])
+        self.assertTrue(isinstance(ret, dict))
+
+    def test_coerce_dict_fail(self):
+        """ Coerce to dict fails if coerce=False """
+        field = Field(data_type=dict)
+        with self.assertRaises(TypeError):
+            field.coerce([(1, 2)])
+
+    def test_coerce_list(self):
+        """ Coerce to list """
+        field = Field(data_type=list, coerce=True)
+        ret = field.coerce(set([1, 2]))
+        self.assertTrue(isinstance(ret, list))
+
+    def test_coerce_list_fail(self):
+        """ Coerce to list fails if coerce=False """
+        field = Field(data_type=list)
+        with self.assertRaises(TypeError):
+            field.coerce(set([1, 2]))
+
+    def test_coerce_bool(self):
+        """ Coerce to bool """
+        field = Field(data_type=bool, coerce=True)
+        ret = field.coerce(2)
+        self.assertTrue(isinstance(ret, bool))
+
+    def test_coerce_bool_fail(self):
+        """ Coerce to bool fails if coerce=False """
+        field = Field(data_type=bool)
+        with self.assertRaises(TypeError):
+            field.coerce(2)
+
+    def test_coerce_datetime_fail(self):
+        """ Coercing to datetime fails """
+        field = Field(data_type=datetime, coerce=True)
+        with self.assertRaises(TypeError):
+            field.coerce(12345)
+
+    def test_coerce_date_fail(self):
+        """ Coercing to date fails """
+        field = Field(data_type=date, coerce=True)
+        with self.assertRaises(TypeError):
+            field.coerce(12345)
 
 
 class TestFields(BaseSystemTest):
@@ -223,15 +411,6 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertTrue(stored_widget.wobbles is True)
 
-    def test_str(self):
-        """ Str type always converts value to bytestring """
-        w = PrimitiveWidget(string=os.urandom(10))
-        self.assertTrue(isinstance(w.string, str))
-        self.engine.save(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
-        self.assertTrue(isinstance(stored_widget.string, str))
-        self.assertEquals(stored_widget.string, w.string)
-
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
         w = PrimitiveWidget(string='a', created=datetime.utcnow())
@@ -253,21 +432,6 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertEquals(w.price, stored_widget.price)
         self.assertTrue(isinstance(stored_widget.price, Decimal))
-
-    def test_int_no_data_loss(self):
-        """ Int fields refuse to drop floating point data """
-        w = PrimitiveWidget()
-        with self.assertRaises(ValueError):
-            w.num = 4.5
-        with self.assertRaises(ValueError):
-            w.num = Decimal('4.5')
-
-    def test_int_coerce(self):
-        """ Int fields can coerce floats """
-        w = PrimitiveWidget()
-        w.num = 4.0
-        self.assertEquals(w.num, 4)
-        self.assertTrue(isinstance(w.num, int))
 
     def test_list_updates(self):
         """ Lists track changes and update during sync() """

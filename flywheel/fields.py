@@ -74,10 +74,6 @@ class GlobalIndex(object):
         index.throughput = self._throughput
         return index
 
-    def get_throughput(self):
-        """ Get the provisioned throughput """
-        return self._throughput
-
     def throughput(self, read=5, write=5):
         """
         Set the index throughput
@@ -462,10 +458,11 @@ class Field(object):
                     raise TypeError("Field '%s' must be an int! %s" %
                                     (self.name, repr(value)))
         elif self.data_type in (NUMBER, float):
-            if not (isinstance(value, int) or isinstance(value, float) or
-                    isinstance(value, Decimal)):
-                if force_coerce:
-                    return Decimal(value)
+            if not isinstance(value, float):
+                if isinstance(value, int) or isinstance(value, Decimal):
+                    return float(value)
+                elif force_coerce:
+                    return float(value)
                 else:
                     raise TypeError("Field '%s' must be a number! %s" %
                                     (self.name, repr(value)))
@@ -478,8 +475,8 @@ class Field(object):
                         return float_to_decimal(value)
                     return Decimal(value)
                 else:
-                    return TypeError("Field '%s' must be a Decimal! %s" %
-                                     (self.name, repr(value)))
+                    raise TypeError("Field '%s' must be a Decimal! %s" %
+                                    (self.name, repr(value)))
         elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
             if not isinstance(value, set):
                 if force_coerce:
@@ -779,6 +776,9 @@ class Composite(Field):
         The dynamo data type. Valid values are (NUMBER, STRING, BINARY,
         NUMBER_SET, STRING_SET, BINARY_SET, dict, list, bool, str, unicode,
         int, float, set, datetime, date, Decimal) (default unicode)
+    check : callable, optional
+        A function that takes the value and returns True if the value is valid
+        (default None)
     merge : callable, optional
         The function that merges the subfields together. By default it simply
         joins them with a ':'.
@@ -790,7 +790,8 @@ class Composite(Field):
         if self.merge is None:
             self.merge = lambda *args: ':'.join(args)
         unrecognized = (set(kwargs.keys()) -
-                        set(['range_key', 'index', 'hash_key', 'data_type']))
+                        set(['range_key', 'index', 'hash_key', 'data_type',
+                             'check', ]))
         if unrecognized:
             raise TypeError("Unrecognized keyword args: %s" % unrecognized)
         if len(args) < 2:
