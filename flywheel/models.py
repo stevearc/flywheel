@@ -96,8 +96,8 @@ class ModelMetadata(object):
     ----------
     model : :class:`.Model`
 
-    Attributes
-    ----------
+    Attribute
+    ---------
     name : str
         The unique name of the model. This is set by the '_name' field in
         __metadata__. Defaults to the name of the model class.

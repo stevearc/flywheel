@@ -44,10 +44,11 @@ class Post(Model):
     userid = Field()
     id = Field()
     c_all = Composite('userid', 'id', 'about', 'text')
-    score = Composite('likes', 'ts', data_type=NUMBER,
-                      merge=lambda x, y: x + y)
+    score = Composite('likes', 'ts', 'deleted', data_type=NUMBER,
+                      merge=lambda x, y, z: None if z else x + y)
     likes = Field(data_type=int)
     ts = Field(data_type=float)
+    deleted = Field(data_type=bool)
     points = Field(data_type=Decimal)
     about = Field()
     text = Field()
@@ -123,6 +124,18 @@ class TestComposite(BaseSystemTest):
         results = table.batch_get(keys=[{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
         self.assertEquals(results[0]['score'], 6)
+
+    def test_set_composite_null(self):
+        """ Composite fields can be set to None """
+        p = Post('a', 'b', 2)
+        self.engine.sync(p)
+        self.assertEquals(p.score, 2)
+        p.deleted = True
+        p.sync()
+        self.assertIsNone(p.score)
+        result = self.engine(Post).filter(c_all=p.c_all)\
+            .index('score-index').first()
+        self.assertIsNone(result)
 
 
 class Article(Model):

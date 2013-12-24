@@ -25,6 +25,6 @@ def float_to_decimal(f):
 boto.dynamodb.types.float_to_decimal = float_to_decimal
 
 
-from .fields import Field, Composite, GlobalIndex, Binary
-from .models import Model, ValidationError
+from .fields import Field, Composite, GlobalIndex
+from .models import Model
 from .engine import Engine

@@ -756,11 +756,12 @@ class Composite(Field):
     range_key : bool, optional
         This key is a DynamoDB range key (default False)
     index : str, optional
-        If present, this key is indexed in DynamoDB. This field is the name of
-        the index.
+        If present, create a local secondary index on this field with this as
+        the name.
     data_type : str, optional
         The dynamo data type. Valid values are (NUMBER, STRING, BINARY,
-        NUMBER_SET, STRING_SET, BINARY_SET, dict, bool) (default STRING)
+        NUMBER_SET, STRING_SET, BINARY_SET, dict, list, bool, str, unicode,
+        int, float, set, datetime, date, Decimal) (default unicode)
     merge : callable, optional
         The function that merges the subfields together. By default it simply
         joins them with a ':'.

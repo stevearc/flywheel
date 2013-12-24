@@ -262,6 +262,13 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         with self.assertRaises(ValueError):
             w.num = Decimal('4.5')
 
+    def test_int_coerce(self):
+        """ Int fields can coerce floats """
+        w = PrimitiveWidget()
+        w.num = 4.0
+        self.assertEquals(w.num, 4)
+        self.assertTrue(isinstance(w.num, int))
+
     def test_list_updates(self):
         """ Lists track changes and update during sync() """
         w = PrimitiveWidget(string='a')
