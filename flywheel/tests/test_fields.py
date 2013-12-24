@@ -19,7 +19,7 @@ class Widget(Model):
     }
     string = Field(hash_key=True)
     string2 = Field()
-    num = Field(data_type=NUMBER)
+    num = Field(data_type=NUMBER, check=lambda x: x >= 0)
     binary = Field(data_type=BINARY, coerce=True)
     str_set = Field(data_type=STRING_SET)
     num_set = Field(data_type=NUMBER_SET)
@@ -45,6 +45,17 @@ class TestFields(BaseSystemTest):
         self.assertEquals(w.str_set, set())
         self.assertEquals(w.num_set, set())
         self.assertEquals(w.bin_set, set())
+
+    def test_valid_check(self):
+        """ Widget saves if validation checks pass """
+        w = Widget(num=5)
+        self.engine.save(w)
+
+    def test_invalid_check(self):
+        """ Widget raises error on save if validation checks fail """
+        w = Widget(num=-5)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
 
     def test_no_save_defaults(self):
         """ Default field values are not saved to dynamo """

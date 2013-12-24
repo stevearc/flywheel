@@ -631,6 +631,12 @@ class Model(object):
     def pre_save(self, engine):
         """ Called before saving items """
         self.__engine__ = engine
+        for field in self.meta_.fields.itervalues():
+            if field.check is not None:
+                val = field.resolve(self)
+                if not field.check(val):
+                    raise ValueError("Validation check on field %s failed "
+                                     "for value %s" % (field.name, val))
 
     def post_save(self):
         """ Called after item is saved to database """

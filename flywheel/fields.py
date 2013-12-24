@@ -305,15 +305,14 @@ class Field(object):
     range_key : bool, optional
         This key is a DynamoDB range key (default False)
     index : str, optional
-        If present, this key is indexed in DynamoDB. This field is the name of
-        the index.
+        If present, create a local secondary index on this field with this as
+        the name.
     data_type : str, optional
         The dynamo data type. Valid values are (NUMBER, STRING, BINARY,
-        NUMBER_SET, STRING_SET, BINARY_SET, dict, bool) (default STRING)
+        NUMBER_SET, STRING_SET, BINARY_SET, dict, list, bool, str, unicode,
+        int, float, set, datetime, date, Decimal) (default unicode)
     coerce : bool, optional
         Attempt to coerce the value if it's the incorrect type (default False)
-    nullable : bool, optional
-        If True, the field is not required (default False)
     check : callable, optional
         A function that takes the value and returns True if the value is valid
         (default None)
@@ -340,7 +339,7 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=unicode, coerce=False, nullable=True, check=None):
+                 data_type=unicode, coerce=False, check=None):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
@@ -353,7 +352,6 @@ class Field(object):
         self.overflow = False
         self.data_type = data_type
         self._coerce = coerce
-        self.nullable = nullable
         self.check = check
         self.hash_key = hash_key
         self.range_key = range_key
@@ -364,8 +362,6 @@ class Field(object):
         self._boto_index_kwargs = None
         if index:
             self.all_index(index)
-        if hash_key or range_key:
-            self.nullable = False
 
     def get_boto_index(self, hash_key):
         """ Construct a boto index object from a hash key """
@@ -777,8 +773,6 @@ class Composite(Field):
     data_type : str, optional
         The dynamo data type. Valid values are (NUMBER, STRING, BINARY,
         NUMBER_SET, STRING_SET, BINARY_SET, dict, bool) (default STRING)
-    nullable : bool, optional
-        If True, the field is not required (default True)
     merge : callable, optional
         The function that merges the subfields together. By default it simply
         joins them with a ':'.
@@ -790,12 +784,11 @@ class Composite(Field):
         if self.merge is None:
             self.merge = lambda *args: ':'.join(args)
         unrecognized = (set(kwargs.keys()) -
-                        set(['range_key', 'index', 'hash_key', 'data_type', 'nullable']))
+                        set(['range_key', 'index', 'hash_key', 'data_type']))
         if unrecognized:
             raise TypeError("Unrecognized keyword args: %s" % unrecognized)
         if len(args) < 2:
             raise TypeError("Composite must consist of two or more fields")
-        kwargs.setdefault('nullable', False)
         super(Composite, self).__init__(**kwargs)
         self.composite = True
         self.subfields = args
