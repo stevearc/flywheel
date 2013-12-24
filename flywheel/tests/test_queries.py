@@ -189,6 +189,20 @@ class TestQueries(BaseSystemTest):
         self.assertTrue(u2 in results)
         self.assertTrue(u3 in results)
 
+    def test_filter_between(self):
+        """ Queries can filter between """
+        u = User(id='a', name='Aaron', score=1)
+        u2 = User(id='a', name='Adam', score=2)
+        u3 = User(id='a', name='Alison', score=3)
+        u4 = User(id='a', name='Andrew', score=4)
+        self.engine.save([u, u2, u3, u4])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.score.between_(u2.score, u3.score)).all()
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u2 in results)
+        self.assertTrue(u3 in results)
+
     def test_filter_beginswith(self):
         """ Queries can filter beginswith """
         u = User(id='a', name='Adam')

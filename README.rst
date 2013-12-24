@@ -1,6 +1,7 @@
 flywheel
 =========
 :Build: |build|_ |coverage|_
+:Documentation: http://flywheel.readthedocs.org/en/latest/
 :Source: https://github.com/mathcamp/flywheel
 
 .. |build| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=master
@@ -85,9 +86,7 @@ installed.
 
 TODO
 ====
-* Between filter
-* atomic add to sets
 * Track mutable overflow fields
-* Json serialization for sets, Decimals, datetime, etc
+* atomic add to sets
 * Cross-table linking (One and Many)
 * Link to S3 for storing large items

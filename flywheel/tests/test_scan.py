@@ -316,6 +316,14 @@ class TestFilterFields(BaseSystemTest):
             .filter(Widget.id.beginswith_('a')).first()
         self.assertEquals(w, ret)
 
+    def test_between_unicode(self):
+        """ Can use 'between' filter on unicode fields """
+        w = Widget(school='Harvard')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.school.between_('Cornell', 'MIT')).first()
+        self.assertEquals(w, ret)
+
     def test_contains_unicode(self):
         """ Cannot use 'contains' filter on unicode fields """
         w = Widget()
@@ -359,6 +367,14 @@ class TestFilterFields(BaseSystemTest):
         self.engine.save(w)
         ret = self.engine.scan(Widget)\
             .filter(Widget.name.beginswith_('d')).first()
+        self.assertEquals(w, ret)
+
+    def test_between_str(self):
+        """ Can use 'between' filter on str fields """
+        w = Widget(name='dsa')
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.name.between_('adam', 'rachel')).first()
         self.assertEquals(w, ret)
 
     def test_contains_str(self):
@@ -407,6 +423,14 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget).filter(Widget.count.beginswith_(4)).all()
 
+    def test_between_int(self):
+        """ Can use 'between' filter on int fields """
+        w = Widget(count=5)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.count.between_(4, 6)).first()
+        self.assertEquals(w, ret)
+
     def test_contains_int(self):
         """ Cannot use 'contains' filter on int fields """
         w = Widget(count=4)
@@ -451,6 +475,14 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
                 .filter(Widget.score.beginswith_(1.3)).all()
+
+    def test_between_float(self):
+        """ Can use 'between' filter on float fields """
+        w = Widget(score=4.4)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.score.between_(4.3, 5.6)).first()
+        self.assertEquals(w, ret)
 
     def test_contains_float(self):
         """ Cannot use 'contains' filter on float fields """
@@ -501,6 +533,14 @@ class TestFilterFields(BaseSystemTest):
             self.engine.scan(Widget)\
                 .filter(Widget.price.beginswith_(Decimal('3.50'))).all()
 
+    def test_between_decimal(self):
+        """ Can use 'between' filter on decimal fields """
+        w = Widget(price=Decimal('3.50'))
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.price.between_('3.40', '3.55')).first()
+        self.assertEquals(w, ret)
+
     def test_contains_decimal(self):
         """ Cannot use 'contains' filter on decimal fields """
         w = Widget(price=Decimal('3.50'))
@@ -549,6 +589,14 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
                 .filter(Widget.isawesome.beginswith_('T')).all()
+
+    def test_between_bool(self):
+        """ Cannot use 'between' filter on bool fields """
+        w = Widget(isawesome=True)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.isawesome.between_(0, 2)).all()
 
     def test_contains_bool(self):
         """ Cannot use 'contains' filter on bool fields """
@@ -602,6 +650,16 @@ class TestFilterFields(BaseSystemTest):
             self.engine.scan(Widget)\
                 .filter(Widget.created.beginswith_(n)).all()
 
+    def test_between_datetime(self):
+        """ Can use 'between' filter on datetime fields """
+        n = datetime.utcnow()
+        w = Widget(created=n)
+        self.engine.save(w)
+        early, late = n - timedelta(seconds=5), n + timedelta(minutes=4)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.created.between_(early, late)).first()
+        self.assertEquals(w, ret)
+
     def test_contains_datetime(self):
         """ Cannot use 'contains' filter on datetime fields """
         n = datetime.utcnow()
@@ -654,6 +712,16 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget)\
                 .filter(Widget.birthday.beginswith_(n)).all()
+
+    def test_between_date(self):
+        """ Can use 'between' filter on date fields """
+        n = date.today()
+        w = Widget(birthday=n)
+        self.engine.save(w)
+        early, late = n, n + timedelta(days=2)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.birthday.between_(early, late)).first()
+        self.assertEquals(w, ret)
 
     def test_contains_date(self):
         """ Cannot use 'contains' filter on date fields """
@@ -710,6 +778,16 @@ class TestFilterFields(BaseSystemTest):
             self.engine.scan(Widget)\
                 .filter(Widget.friends.beginswith_(f2)).all()
 
+    def test_between_set(self):
+        """ Cannot use 'between' filter on set fields """
+        f = set(['a'])
+        f2 = set(['a', 'b', 'c'])
+        w = Widget(friends=f)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget)\
+                .filter(Widget.friends.between_(f, f2)).all()
+
     def test_contains_set(self):
         """ Can use 'contains' filter on set fields """
         f = set(['a'])
@@ -762,6 +840,14 @@ class TestFilterFields(BaseSystemTest):
         with self.assertRaises(TypeError):
             self.engine.scan(Widget).filter(Widget.data.beginswith_(d)).all()
 
+    def test_between_dict(self):
+        """ Cannot use 'between' filter on dict fields """
+        d = {'foo': 'bar'}
+        w = Widget(data=d)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.data.between_(d, d)).all()
+
     def test_contains_dict(self):
         """ Cannot use 'contains' filter on dict fields """
         d = {'foo': 'bar'}
@@ -811,6 +897,14 @@ class TestFilterFields(BaseSystemTest):
         self.engine.save(w)
         with self.assertRaises(TypeError):
             self.engine.scan(Widget).filter(Widget.queue.beginswith_(q)).all()
+
+    def test_between_list(self):
+        """ Cannot use 'between' filter on list fields """
+        q = ['a']
+        w = Widget(queue=q)
+        self.engine.save(w)
+        with self.assertRaises(TypeError):
+            self.engine.scan(Widget).filter(Widget.queue.between_(q, q)).all()
 
     def test_contains_list(self):
         """ Cannot use 'contains' filter on list fields """

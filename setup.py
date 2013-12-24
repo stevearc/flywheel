@@ -32,6 +32,7 @@ if __name__ == "__main__":
         author='Steven Arcangeli',
         author_email='steven@highlig.ht',
         url='http://github.com/mathcamp/flywheel',
+        keywords='aws dynamo dynamodb orm odm',
         zip_safe=False,
         include_package_data=True,
         packages=find_packages(),

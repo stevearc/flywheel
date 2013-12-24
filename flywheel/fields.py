@@ -741,6 +741,23 @@ class Field(object):
             other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'beginswith', other)
 
+    def between_(self, low, high):
+        """
+        Create a query condition that this field must be between two values
+        (inclusive)
+
+        """
+        if self.data_type in (bool, NUMBER_SET, STRING_SET, BINARY_SET, set):
+            raise TypeError("Cannot use 'between' filter on %s field" %
+                            self.data_type)
+        low = self.ddb_dump_for_query(low)
+        high = self.ddb_dump_for_query(high)
+        return Condition.construct(self.name, 'between', (low, high))
+
+    def betwixt_(self, low, high):
+        """ Poetic version of between_ """
+        return self.between_(low, high)
+
 
 class Composite(Field):
 

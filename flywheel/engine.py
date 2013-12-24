@@ -101,6 +101,7 @@ class Query(object):
             ResultItems instead of model objects.
 
         """
+        self.limit(1)
         for result in self.gen(desc=desc, consistent=consistent,
                                attributes=attributes):
             return result
@@ -125,15 +126,13 @@ class Query(object):
             If there is not exactly one result
 
         """
-        result = None
-        for item in self.gen(consistent=consistent, attributes=attributes):
-            if result is not None:
-                raise ValueError("More than one result!")
-            else:
-                result = item
-        if result is None:
+        self.limit(2)
+        items = self.all(consistent=consistent, attributes=attributes)
+        if len(items) > 1:
+            raise ValueError("More than one result!")
+        elif len(items) == 0:
             raise ValueError("Expected one result!")
-        return result
+        return items[0]
 
     def limit(self, count):
         """ Limit the number of query results """
