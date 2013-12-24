@@ -78,14 +78,9 @@ class TestComposite(BaseSystemTest):
         self.engine.save(w)
         table = w.meta_.ddb_table(self.dynamo)
         item = list(table.scan())[0]
-        self.assertEquals(dict(item),
-                          {'userid': w.userid,
-                           'ts': w.ts,
-                           'id': w.id,
-                           'c_range': w.c_range,
-                           'c_index': w.c_index,
-                           'c_plain': w.c_plain,
-                           })
+        self.assertEquals(item['c_range'], w.c_range)
+        self.assertEquals(item['c_index'], w.c_index)
+        self.assertEquals(item['c_plain'], w.c_plain)
 
     def test_no_change_composite_hash(self):
         """ Changing the hash key raises an exception """
