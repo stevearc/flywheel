@@ -76,7 +76,7 @@ This will clone the repository and install the package into a virtualenv
 
 Running Tests
 -------------
-The command to run tests is ``python setup.py nosetests``. Some of these tests
+The command to run tests is ``python setup.py nosetests``. Most of these tests
 require `DynamoDB Local
 <http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tools.html>`_.
 There is a nose plugin that will download and run the DynamoDB Local service
@@ -85,8 +85,9 @@ installed.
 
 TODO
 ====
-* Documentation
 * Between filter
+* atomic add to sets
 * Track mutable overflow fields
+* Json serialization for sets, Decimals, datetime, etc
 * Cross-table linking (One and Many)
-* Json serialization for sets, Decimals, etc
+* Link to S3 for storing large items

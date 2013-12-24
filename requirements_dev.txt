@@ -3,3 +3,5 @@ pep8
 autopep8
 tox
 nose
+sphinx
+numpydoc
