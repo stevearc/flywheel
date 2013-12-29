@@ -36,7 +36,7 @@ existing data on the item. To force a consistent read use
 
 This call is very useful if you query indexes that use an incomplete projection
 type. The results won't have all of the item's fields, so you can call
-``refresh()`` to get any indexes that weren't projected onto the index.
+``refresh()`` to get any attributes that weren't projected onto the index.
 
 .. code-block:: python
 
@@ -85,7 +85,7 @@ different fields.
     >>> tweet2 = engine.query(Tweet).filter(userid='abc123', id='1234').first()
     >>> tweet.author = "The Pope"
     >>> tweet.sync()
-    >>> tweet2.link = "Mo' money mo' problems"
+    >>> tweet2.text = "Mo' money mo' problems"
     >>> tweet2.sync() #  it works!
     >>> print tweet2.author
     The Pope
@@ -135,5 +135,5 @@ You can configure the default behavior for each of these endpoints using
 :attr:`~flywheel.engine.Engine.default_atomic`. The default setting will cause
 ``sync()`` to be atomic, ``delete()`` not to be, and ``save()`` will overwrite.
 Check the attribute docs for more options. You can, of course, pass in the
-argument to the calls manually to override this behavior on a case-by-case
+argument to the calls directly to override this behavior on a case-by-case
 basis.

@@ -88,5 +88,7 @@ TODO
 ====
 * Track mutable overflow fields
 * atomic add to sets
+* always make composite subfield syncs atomic
+* hooks for user-defined field types
 * Link to S3 for storing large items
 * Cross-table linking (One and Many)
