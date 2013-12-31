@@ -467,3 +467,8 @@ class TestEngine(BaseSystemTest):
         """ Fetching empty list of keys returns empty list """
         ret = self.engine.get(Post, [])
         self.assertEqual(ret, [])
+
+    def test_get_missing(self):
+        """ Fetching a missing item returns None """
+        ret = self.engine.get(Post, uid='a', score=4)
+        self.assertIsNone(ret)

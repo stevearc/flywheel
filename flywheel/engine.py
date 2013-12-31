@@ -455,7 +455,9 @@ class Engine(object):
         items = [model.ddb_load(self, raw_item) for raw_item in raw_items]
         if pkeys is not None:
             return items
-        return items[0]
+        if len(items) > 0:
+            return items[0]
+        return None
 
     def delete(self, items, atomic=None):
         """
