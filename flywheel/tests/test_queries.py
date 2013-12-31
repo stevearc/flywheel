@@ -427,3 +427,38 @@ class TestOrder(BaseSystemTest):
         items = self.engine(Widget).filter(id='a').index('beta-index').all()
         beta = [item.beta for item in items]
         self.assertEquals(beta, sorted(beta))
+
+
+class TestEngine(BaseSystemTest):
+
+    """ Tests for misc engine functionality """
+    models = [Post]
+
+    def test_get(self):
+        """ Fetch item directly by primary key """
+        p = Post(type='tweet', id='1234')
+        self.engine.save(p)
+
+        ret = self.engine.get(Post, uid='tweet:1234', score=0)
+        self.assertEqual(ret, p)
+
+    def test_get_many(self):
+        """ Fetch multiple items directly by primary key """
+        p = Post(type='tweet', id='1234')
+        p2 = Post(type='post', id='2345')
+        self.engine.save([p, p2])
+
+        ret = self.engine.get(Post,
+                              [{'uid': 'tweet:1234', 'score': 0},
+                               {'uid': 'post:2345', 'score': 0}])
+        self.assertEqual(len(ret), 2)
+        self.assertTrue(p in ret)
+        self.assertTrue(p2 in ret)
+
+    def test_get_composite_pieces(self):
+        """ Fetch item directly by pieces of composite primary key """
+        p = Post(type='tweet', id='1234')
+        self.engine.save(p)
+
+        ret = self.engine.get(Post, type='tweet', id='1234', ts=0, upvotes=0)
+        self.assertEqual(ret, p)

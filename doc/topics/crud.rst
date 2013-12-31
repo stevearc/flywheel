@@ -2,8 +2,8 @@
 
 CRUD
 ====
-This section covers the operations you can do to save, update, and delete items
-from the database. All of these methods exist on the
+This section covers the operations you can do to save, read, update, and delete
+items from the database. All of these methods exist on the
 :class:`~flywheel.engine.Engine` object and can be called on one or many items.
 After being saved-to or loaded-from Dynamo, the items themselves will have
 these methods attached to them as well. For example, these are both valid:
@@ -43,6 +43,24 @@ type. The results won't have all of the item's fields, so you can call
     >>> tweet = engine.query(Tweet).filter(userid='abc123')\
     ...         .index('ts-index').first(desc=True)
     >>> tweet.refresh()
+
+Get
+---
+Fetch an item from its primary key fields. This will be faster than a query,
+but requires you to know the primary key/keys of all items you want fetched.
+
+.. code-block:: python
+
+    >>> my_tweet = engine.get(Tweet, userid='abc123', id='1')
+
+You can also fetch many at a time:
+
+.. code-block:: python
+
+    >>> key1 = {'userid': 'abc123', 'id': '1'}
+    >>> key2 = {'userid': 'abc123', 'id': '2'}
+    >>> key3 = {'userid': 'abc123', 'id': '3'}
+    >>> some_tweets = engine.get(Tweet, [key1, key2, key3])
 
 Delete
 ------

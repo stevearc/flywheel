@@ -263,6 +263,15 @@ class ModelMetadata(object):
         else:
             return hk
 
+    def pk_dict(self, obj=None, scope=None):
+        """ Get the dynamo primary key dict for an item """
+        hk = self.hk(obj, scope)
+        rk = self.rk(obj, scope)
+        key_dict = {self.hash_key.name: hk}
+        if rk is not None:
+            key_dict[self.range_key.name] = rk
+        return key_dict
+
     @property
     def ddb_tablename(self):
         """ The name of the DynamoDB table """

@@ -421,6 +421,40 @@ class Engine(object):
         """
         return Scan(self, model)
 
+    def get(self, model, pkeys=None, consistent=False, **kwargs):
+        """
+        Fetch one or more items from dynamo from the primary keys
+
+        Parameters
+        ----------
+        model : :class:`~flywheel.models.Model`
+        pkeys : list, optional
+            List of primary key dicts
+        consistent : bool, optional
+            Perform a consistent read from dynamo (default False)
+        **kwargs : dict
+            If pkeys is None, fetch only a single item and use kwargs as the
+            primary key dict.
+
+        Returns
+        -------
+        items : list or object
+            If pkeys is a list of key dicts, this will be a list of items. If
+            pkeys is None and **kwargs is used, this will be a single object.
+
+        """
+        if pkeys is not None:
+            keys = [model.meta_.pk_dict(scope=key) for key in pkeys]
+        else:
+            keys = [model.meta_.pk_dict(scope=kwargs)]
+
+        table = model.meta_.ddb_table(self.dynamo)
+        raw_items = table.batch_get(keys=keys, consistent=consistent)
+        items = [model.ddb_load(self, raw_item) for raw_item in raw_items]
+        if pkeys is not None:
+            return items
+        return items[0]
+
     def delete(self, items, atomic=None):
         """
         Delete items from dynamo
