@@ -444,6 +444,8 @@ class Engine(object):
 
         """
         if pkeys is not None:
+            if len(pkeys) == 0:
+                return []
             keys = [model.meta_.pk_dict(scope=key) for key in pkeys]
         else:
             keys = [model.meta_.pk_dict(scope=kwargs)]

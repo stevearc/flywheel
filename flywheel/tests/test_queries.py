@@ -462,3 +462,8 @@ class TestEngine(BaseSystemTest):
 
         ret = self.engine.get(Post, type='tweet', id='1234', ts=0, upvotes=0)
         self.assertEqual(ret, p)
+
+    def test_get_empty(self):
+        """ Fetching empty list of keys returns empty list """
+        ret = self.engine.get(Post, [])
+        self.assertEqual(ret, [])
