@@ -445,7 +445,7 @@ class Field(object):
                     raise TypeError("Field '%s' must be a byte string! %s" %
                                     (self.name, repr(value)))
         elif self.data_type == int:
-            if not isinstance(value, int):
+            if not isinstance(value, int) and not isinstance(value, long):
                 if force_coerce:
                     new_val = int(value)
                     if isinstance(value, float) or isinstance(value, Decimal):
@@ -459,7 +459,8 @@ class Field(object):
                                     (self.name, repr(value)))
         elif self.data_type in (NUMBER, float):
             if not isinstance(value, float):
-                if isinstance(value, int) or isinstance(value, Decimal):
+                if (isinstance(value, int) or isinstance(value, long) or
+                        isinstance(value, Decimal)):
                     return float(value)
                 elif force_coerce:
                     return float(value)
@@ -572,7 +573,8 @@ class Field(object):
         """ Dump an overflow value to its Dynamo format """
         if val is None:
             return None
-        elif isinstance(val, int) or isinstance(val, float):
+        elif (isinstance(val, int) or isinstance(val, float) or
+              isinstance(val, long)):
             return val
         elif isinstance(val, set):
             return val
@@ -583,7 +585,7 @@ class Field(object):
     def ddb_load_overflow(cls, val):
         """ Decode a value of an overflow field """
         if (isinstance(val, Decimal) or isinstance(val, float) or
-           isinstance(val, int)):
+           isinstance(val, int) or isinstance(val, long)):
             return val
         elif isinstance(val, set):
             return val

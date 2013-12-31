@@ -129,6 +129,13 @@ class TestFieldCoerce(unittest.TestCase):
         with self.assertRaises(TypeError):
             field.coerce(4.0)
 
+    def test_int_coerce_long(self):
+        """ Int fields can transparently handle longs """
+        field = Field(data_type=int)
+        val = 100L
+        ret = field.coerce(val)
+        self.assertEqual(ret, val)
+
     def test_coerce_float(self):
         """ Coerce to float """
         field = Field(data_type=float, coerce=True)
