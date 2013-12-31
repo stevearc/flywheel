@@ -442,6 +442,18 @@ class Engine(object):
             If pkeys is a list of key dicts, this will be a list of items. If
             pkeys is None and **kwargs is used, this will be a single object.
 
+        Notes
+        -----
+        If the model being fetched has no range key, you may use strings
+        instead of primary key dicts. ex:
+
+        .. code-block:: python
+
+            >>> class Item(Model):
+            ...     id = Field(hash_key=True)
+            ...
+            >>> items = engine.get(Item, ['abc', 'def', '123', '456'])
+
         """
         if pkeys is not None:
             if len(pkeys) == 0:

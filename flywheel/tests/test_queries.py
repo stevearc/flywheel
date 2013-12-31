@@ -429,10 +429,19 @@ class TestOrder(BaseSystemTest):
         self.assertEquals(beta, sorted(beta))
 
 
+class SingleKeyModel(Model):
+
+    """ Model with a no range key """
+    id = Field(hash_key=True)
+
+    def __init__(self, id='a'):
+        self.id = id
+
+
 class TestEngine(BaseSystemTest):
 
     """ Tests for misc engine functionality """
-    models = [Post]
+    models = [Post, SingleKeyModel]
 
     def test_get(self):
         """ Fetch item directly by primary key """
@@ -472,3 +481,11 @@ class TestEngine(BaseSystemTest):
         """ Fetching a missing item returns None """
         ret = self.engine.get(Post, uid='a', score=4)
         self.assertIsNone(ret)
+
+    def test_smart_scope(self):
+        """ Models with no range key can fetch from string """
+        m = SingleKeyModel()
+        self.engine.save(m)
+
+        ret = self.engine.get(SingleKeyModel, [m.id])
+        self.assertEqual(ret, [m])

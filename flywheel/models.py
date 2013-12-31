@@ -265,6 +265,12 @@ class ModelMetadata(object):
 
     def pk_dict(self, obj=None, scope=None):
         """ Get the dynamo primary key dict for an item """
+        # If we can unambiguously tell that a single string defines the primary
+        # key, allow scope to be a single string
+        if (obj is None and isinstance(scope, basestring) and
+                self.range_key is None):
+            scope = {self.hash_key.name: scope}
+
         hk = self.hk(obj, scope)
         rk = self.rk(obj, scope)
         key_dict = {self.hash_key.name: hk}
