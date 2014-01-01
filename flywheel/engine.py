@@ -151,6 +151,9 @@ class Query(object):
         if meta.range_key is not None:
             attrs.append(meta.range_key.name)
         results = self.gen(attributes=attrs)
+        # TODO: uncomment this line once boto API supports passing 'attributes'
+        # to Table.scan()
+        # return self.engine.delete_key(self.model, results)
         return self.engine._delete_items(self.model.meta_.ddb_tablename,
                                          results, atomic=False)
 
@@ -470,6 +473,54 @@ class Engine(object):
         if len(items) > 0:
             return items[0]
         return None
+
+    def delete_key(self, model, pkeys=None, **kwargs):
+        """
+        Delete one or more items from dynamo as specified by primary keys
+
+        Parameters
+        ----------
+        model : :class:`~flywheel.models.Model`
+        pkeys : list, optional
+            List of primary key dicts
+        **kwargs : dict
+            If pkeys is None, delete only a single item and use kwargs as the
+            primary key dict
+
+        Returns
+        -------
+        count : int
+            The number of deleted items
+
+        Notes
+        -----
+        If the model being deleted has no range key, you may use strings
+        instead of primary key dicts. ex:
+
+        .. code-block:: python
+
+            >>> class Item(Model):
+            ...     id = Field(hash_key=True)
+            ...
+            >>> items = engine.delete_key(Item, ['abc', 'def', '123', '456'])
+
+        """
+        if pkeys is not None:
+            keys = pkeys
+        else:
+            keys = [kwargs]
+
+        count = 0
+        table = Table(model.meta_.ddb_tablename, connection=self.dynamo)
+        with table.batch_write() as batch:
+            for key in keys:
+                pkey = model.meta_.pk_dict(scope=key)
+                batch.delete_item(**pkey)
+                count += 1
+        return count
+
+    # Alias because it makes sense
+    delete_keys = delete_key
 
     def delete(self, items, atomic=None):
         """

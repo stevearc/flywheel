@@ -263,7 +263,7 @@ class ModelMetadata(object):
         else:
             return hk
 
-    def pk_dict(self, obj=None, scope=None):
+    def pk_dict(self, obj=None, scope=None, ddb_dump=False):
         """ Get the dynamo primary key dict for an item """
         # If we can unambiguously tell that a single string defines the primary
         # key, allow scope to be a single string
@@ -272,9 +272,13 @@ class ModelMetadata(object):
             scope = {self.hash_key.name: scope}
 
         hk = self.hk(obj, scope)
+        if ddb_dump:
+            hk = self.hash_key.ddb_dump(hk)
         rk = self.rk(obj, scope)
         key_dict = {self.hash_key.name: hk}
         if rk is not None:
+            if ddb_dump:
+                rk = self.range_key.ddb_dump(rk)
             key_dict[self.range_key.name] = rk
         return key_dict
 
@@ -593,13 +597,8 @@ class Model(object):
 
     @property
     def pk_dict_(self):
-        """ The primary key dict """
-        key = {}
-        for field in (self.meta_.hash_key, self.meta_.range_key):
-            if field is None:
-                continue
-            key[field.name] = field.ddb_dump(field.resolve(self))
-        return key
+        """ The primary key dict, encoded for dynamo """
+        return self.meta_.pk_dict(self, ddb_dump=True)
 
     def keys_(self):
         """ All declared fields and any additional fields """

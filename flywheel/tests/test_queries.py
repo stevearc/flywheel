@@ -482,10 +482,36 @@ class TestEngine(BaseSystemTest):
         ret = self.engine.get(Post, uid='a', score=4)
         self.assertIsNone(ret)
 
-    def test_smart_scope(self):
+    def test_get_smart_scope(self):
         """ Models with no range key can fetch from string """
         m = SingleKeyModel()
         self.engine.save(m)
 
         ret = self.engine.get(SingleKeyModel, [m.id])
         self.assertEqual(ret, [m])
+
+    def test_delete_key(self):
+        """ Delete item directly by primary key """
+        m = SingleKeyModel()
+        self.engine.save(m)
+
+        self.engine.delete_key(SingleKeyModel, id=m.id)
+        self.assertIsNone(self.engine.scan(SingleKeyModel).first())
+
+    def test_delete_key_many(self):
+        """ Delete multiple keys directly by primary key """
+
+    def test_delete_key_composite_pieces(self):
+        """ Delete item directly by pieces of composite primary key """
+
+    def test_delete_smart_scope(self):
+        """ Models with no range key can delete from string """
+        m = SingleKeyModel()
+        self.engine.save(m)
+
+        self.engine.delete_key(SingleKeyModel, [m.id])
+        self.assertIsNone(self.engine.scan(SingleKeyModel).first())
+
+    def test_delete_key_empty(self):
+        """ No error if deleting no keys """
+        self.engine.delete_key(SingleKeyModel, [])

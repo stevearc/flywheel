@@ -72,6 +72,21 @@ delete the item if none of the values have changed since it was read.
     >>> tweet = engine.query(Tweet).filter(userid='abc123', id='123').first()
     >>> tweet.delete()
 
+You may also delete an item from a primary key specification:
+
+.. code-block:: python
+
+    >>> engine.delete_key(Tweet, userid='abc123', id='1')
+
+And you may delete many at once:
+
+.. code-block:: python
+
+    >>> key1 = {'userid': 'abc123', 'id': '1'}
+    >>> key2 = {'userid': 'abc123', 'id': '2'}
+    >>> key3 = {'userid': 'abc123', 'id': '3'}
+    >>> engine.delete_key(Tweet, [key1, key2, key3])
+
 Sync
 ----
 Save any fields that have been changed on an item. This will update changed
