@@ -586,7 +586,9 @@ class Field(object):
         """ Decode a value of an overflow field """
         if (isinstance(val, Decimal) or isinstance(val, float) or
            isinstance(val, int) or isinstance(val, long)):
-            return val
+            if val % 1 == 0:
+                return int(val)
+            return float(val)
         elif isinstance(val, set):
             return val
         else:

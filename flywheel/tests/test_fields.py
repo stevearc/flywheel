@@ -1,5 +1,4 @@
 """ Tests for fields """
-import os
 from datetime import datetime, date
 
 import json
@@ -351,6 +350,26 @@ class TestFields(BaseSystemTest):
         self.assertEquals(result['foobar'], json.dumps(foobar))
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(stored_widget.foobar, foobar)
+
+    def test_convert_overflow_int(self):
+        """ Should convert overflow ints from Decimal when loading """
+        w = Widget(string='a')
+        w.foobar = 1
+        self.engine.save(w)
+
+        fetched = self.engine.scan(Widget).first()
+        self.assertEqual(fetched.foobar, 1)
+        self.assertTrue(isinstance(fetched.foobar, int))
+
+    def test_convert_overflow_float(self):
+        """ Should convert overflow floats from Decimal when loading """
+        w = Widget(string='a')
+        w.foobar = 1.3
+        self.engine.save(w)
+
+        fetched = self.engine.scan(Widget).first()
+        self.assertEqual(fetched.foobar, 1.3)
+        self.assertTrue(isinstance(fetched.foobar, float))
 
 
 class PrimitiveWidget(Model):
