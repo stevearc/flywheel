@@ -476,6 +476,17 @@ class TestModelMutation(BaseSystemTest):
         p2.sync()
         self.assertEqual(p2.tags, set(['a', 'b', 'c']))
 
+    def test_atomic_add_to_set_conflict(self):
+        """ Atomically adding value to a set can raise error on conflic """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p.add_(tags='a')
+        p2.add_(tags=set(['b', 'c']))
+        p.sync()
+        with self.assertRaises(ConditionalCheckFailedException):
+            p2.sync(atomic=True)
+
     def test_atomic_add_to_set_presync(self):
         """ Atomically adding to a set should update local model value """
         p = Post('a', 'b', 0)

@@ -776,7 +776,7 @@ class Engine(object):
                 if _atomic:
                     cache_val = item.cached_(name)
                     expect = {
-                        'Exists': cache_val is not None,
+                        'Exists': cache_val is not None and cache_val != set(),
                     }
                     if expect['Exists']:
                         expect['Value'] = DYNAMIZER.encode(cache_val)
