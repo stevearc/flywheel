@@ -333,14 +333,15 @@ class Field(object):
         Field().all_index('my-index')
 
     """
+    __valid_types__ = set([STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
+                           BINARY_SET, dict, bool, list, datetime, str,
+                           unicode, int, float, set, date, Decimal])
 
     def __init__(self, hash_key=False, range_key=False, index=None,
                  data_type=unicode, coerce=False, check=None):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
-        if data_type not in (STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
-                             BINARY_SET, dict, bool, list, datetime, str,
-                             unicode, int, float, set, date, Decimal):
+        if data_type not in self.__valid_types__:
             raise TypeError("Unknown data type '%s'" % data_type)
         self.name = None
         self.model = None
@@ -593,6 +594,13 @@ class Field(object):
             return val
         else:
             return json.loads(val)
+
+    @classmethod
+    def is_overflow_mutable(cls, val):
+        """ Check if an overflow field is mutable """
+        if type(val) in cls.__valid_types__:
+            return type(val) in (dict, list, set)
+        return True
 
     @property
     def default(self):

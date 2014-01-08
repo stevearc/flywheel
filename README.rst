@@ -86,7 +86,6 @@ installed.
 
 TODO
 ====
-* Track mutable overflow fields
 * atomic add to sets
 * always make composite subfield syncs atomic
 * hooks for user-defined field types

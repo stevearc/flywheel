@@ -693,8 +693,13 @@ class Model(object):
     def _reset_cache(self):
         """ Reset the __cache__ to only track mutable fields """
         self.__cache__ = {}
-        for name, field in self.meta_.fields.iteritems():
-            if field.is_mutable:
+        for name in self.keys_():
+            field = self.meta_.fields.get(name)
+            if field is None:
+                value = self.get(name)
+                if Field.is_overflow_mutable(value):
+                    self.__cache__[name] = copy.copy(value)
+            elif field.is_mutable:
                 self.__cache__[name] = copy.copy(getattr(self, name))
 
     @contextlib.contextmanager

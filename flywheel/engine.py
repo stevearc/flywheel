@@ -705,8 +705,14 @@ class Engine(object):
         for item in items:
             _atomic = atomic
             # Look for any mutable fields (e.g. sets) that have changed
-            for name, field in item.meta_.fields.iteritems():
-                if field.is_mutable and name not in item.__dirty__:
+            for name in item.keys_():
+                field = item.meta_.fields.get(name)
+                if field is None:
+                    value = item.get(name)
+                    if Field.is_overflow_mutable(value):
+                        if value != item.cached_(name):
+                            item.__dirty__.add(name)
+                elif field.is_mutable and name not in item.__dirty__:
                     cached_var = item.cached_(name)
                     if cached_var is None:
                         cached_var = field.default

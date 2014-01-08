@@ -14,6 +14,8 @@ try:
 except ImportError:
     import unittest
 
+# pylint: disable=E1101
+
 
 class Widget(Model):
 
@@ -30,6 +32,8 @@ class Widget(Model):
     str_set = Field(data_type=STRING_SET)
     num_set = Field(data_type=NUMBER_SET)
     bin_set = Field(data_type=BINARY_SET)
+    data_dict = Field(data_type=dict)
+    data_list = Field(data_type=list)
 
     def __init__(self, **kwargs):
         self.string = 'abc'
@@ -228,7 +232,7 @@ class TestFieldCoerce(unittest.TestCase):
 
 class TestFields(BaseSystemTest):
 
-    """ Tests for default values """
+    """ Tests for fields """
     models = [Widget]
 
     def test_field_default(self):
@@ -240,6 +244,8 @@ class TestFields(BaseSystemTest):
         self.assertEquals(w.str_set, set())
         self.assertEquals(w.num_set, set())
         self.assertEquals(w.bin_set, set())
+        self.assertEquals(w.data_dict, {})
+        self.assertEquals(w.data_list, [])
 
     def test_valid_check(self):
         """ Widget saves if validation checks pass """
@@ -283,7 +289,7 @@ class TestFields(BaseSystemTest):
         w.str_set.add('hi')
         w.sync()
         stored_widget = self.engine.scan(Widget).all()[0]
-        self.assertEquals(w.str_set, stored_widget.str_set)
+        self.assertEquals(stored_widget.str_set, set(['hi']))
 
     def test_set_updates_fetch(self):
         """ Items retrieved from db have sets that track changes """
@@ -370,6 +376,54 @@ class TestFields(BaseSystemTest):
         fetched = self.engine.scan(Widget).first()
         self.assertEqual(fetched.foobar, 1.3)
         self.assertTrue(isinstance(fetched.foobar, float))
+
+    def test_dict_updates(self):
+        """ Dicts track changes and update during sync() """
+        w = Widget(string='a')
+        self.engine.save(w)
+        w.data_dict['a'] = 'b'
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(stored_widget.data_dict, {'a': 'b'})
+
+    def test_list_updates(self):
+        """ Lists track changes and update during sync() """
+        w = Widget(string='a')
+        self.engine.save(w)
+        w.data_list.append('a')
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(stored_widget.data_list, ['a'])
+
+    def test_overflow_set_updates(self):
+        """ Overflow sets track changes and update during sync() """
+        w = Widget(string='a')
+        w.myset = set(['a'])
+        self.engine.save(w)
+        w.myset.add('b')
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(stored_widget.myset, set(['a', 'b']))
+
+    def test_overflow_dict_updates(self):
+        """ Overflow dicts track changes and update during sync() """
+        w = Widget(string='a')
+        w.mydict = {'a': 'b'}
+        self.engine.save(w)
+        w.mydict['c'] = 'd'
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(stored_widget.mydict, {'a': 'b', 'c': 'd'})
+
+    def test_overflow_list_updates(self):
+        """ Overflow lists track changes and update during sync() """
+        w = Widget(string='a')
+        w.mylist = ['a']
+        self.engine.save(w)
+        w.mylist.append('b')
+        w.sync()
+        stored_widget = self.engine.scan(Widget).all()[0]
+        self.assertEquals(stored_widget.mylist, ['a', 'b'])
 
 
 class PrimitiveWidget(Model):
