@@ -736,8 +736,10 @@ class Engine(object):
             # Set dynamo keys
             data = {}
             for name in fields:
+                field = item.meta_.fields.get(name)
                 value = getattr(item, name)
-                if value is None:
+                # Empty sets can't be stored, so delete the value instead
+                if value is None or value == set():
                     action = 'DELETE'
                 else:
                     action = 'PUT'
@@ -750,7 +752,6 @@ class Engine(object):
                     expect = {
                         'Exists': cache_val is not None,
                     }
-                    field = item.meta_.fields.get(name)
                     if field is not None:
                         cache_val = field.ddb_dump(cache_val)
                     else:

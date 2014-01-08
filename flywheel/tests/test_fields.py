@@ -242,9 +242,9 @@ class TestFields(BaseSystemTest):
         self.assertIsNone(w.string2)
         self.assertIsNone(w.binary)
         self.assertIsNone(w.num)
-        self.assertIsNone(w.str_set)
-        self.assertIsNone(w.num_set)
-        self.assertIsNone(w.bin_set)
+        self.assertEquals(w.str_set, set())
+        self.assertEquals(w.num_set, set())
+        self.assertEquals(w.bin_set, set())
         self.assertIsNone(w.data_dict)
         self.assertIsNone(w.data_list)
 
@@ -386,7 +386,7 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         w.data_dict['a'] = 'b'
         w.sync()
-        stored_widget = self.engine.scan(Widget).all()[0]
+        stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.data_dict, {'a': 'b'})
 
     def test_list_updates(self):
@@ -396,7 +396,7 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         w.data_list.append('a')
         w.sync()
-        stored_widget = self.engine.scan(Widget).all()[0]
+        stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.data_list, ['a'])
 
     def test_overflow_set_updates(self):
@@ -406,7 +406,7 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         w.myset.add('b')
         w.sync()
-        stored_widget = self.engine.scan(Widget).all()[0]
+        stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.myset, set(['a', 'b']))
 
     def test_overflow_dict_updates(self):
@@ -416,7 +416,7 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         w.mydict['c'] = 'd'
         w.sync()
-        stored_widget = self.engine.scan(Widget).all()[0]
+        stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.mydict, {'a': 'b', 'c': 'd'})
 
     def test_overflow_list_updates(self):
@@ -426,8 +426,22 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         w.mylist.append('b')
         w.sync()
-        stored_widget = self.engine.scan(Widget).all()[0]
+        stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.mylist, ['a', 'b'])
+
+    def test_empty_set_save(self):
+        """ Models can initialize an empty set and saving will work fine """
+        w = Widget(str_set=set())
+        self.engine.save(w)
+        stored_widget = self.engine.scan(Widget).first()
+        self.assertEqual(stored_widget.str_set, set())
+
+    def test_empty_set_sync(self):
+        """ Models can initialize an empty set and syncing will work fine """
+        w = Widget(str_set=set())
+        self.engine.sync(w)
+        stored_widget = self.engine.scan(Widget).first()
+        self.assertEqual(stored_widget.str_set, set())
 
 
 class PrimitiveWidget(Model):
@@ -470,7 +484,7 @@ class TestPrimitiveDataTypes(BaseSystemTest):
         self.assertIsNone(w.binary)
         self.assertIsNone(w.num)
         self.assertIsNone(w.num2)
-        self.assertIsNone(w.myset)
+        self.assertEquals(w.myset, set())
         self.assertIsNone(w.data)
         self.assertIsNone(w.wobbles)
         self.assertIsNone(w.friends)

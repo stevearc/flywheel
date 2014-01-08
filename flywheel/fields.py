@@ -289,6 +289,9 @@ class Condition(object):
         return new_condition
 
 
+NO_ARG = object()
+
+
 class Field(object):
 
     """
@@ -314,7 +317,7 @@ class Field(object):
         (default None)
     default : object, optional
         The default value for this field that will be set when creating a model
-        (default None)
+        (default None, except for ``set`` data types which default to set())
 
     Attributes
     ----------
@@ -341,7 +344,7 @@ class Field(object):
                            unicode, int, float, set, date, Decimal])
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=unicode, coerce=False, check=None, default=None):
+                 data_type=unicode, coerce=False, check=None, default=NO_ARG):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         if data_type not in self.__valid_types__:
@@ -360,7 +363,13 @@ class Field(object):
         self.index_name = None
         self._boto_index = None
         self._boto_index_kwargs = None
-        self.default = default
+        if default is NO_ARG:
+            if self.is_set:
+                self.default = set()
+            else:
+                self.default = None
+        else:
+            self.default = default
         if index:
             self.all_index(index)
 

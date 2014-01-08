@@ -839,7 +839,7 @@ class Model(object):
         for name in self.keys_():
             cache_val = self.cached_(name)
             expect = {
-                'Exists': cache_val is not None,
+                'Exists': cache_val is not None and cache_val != set(),
             }
             field = self.meta_.fields.get(name)
             if field is not None:

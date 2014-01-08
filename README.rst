@@ -85,6 +85,7 @@ installed.
 
 TODO
 ====
+* tests for sync() to make sure we don't sync unchanged fields
 * always make composite subfield syncs atomic (use model.construct_ddb_expected)
 * hooks for user-defined field types
 * Link to S3 for storing large items
