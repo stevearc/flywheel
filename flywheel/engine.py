@@ -9,7 +9,7 @@ from boto.dynamodb2.types import Dynamizer
 from collections import defaultdict
 
 from .fields import Field, Condition
-from .models import Model, ModelMetadata
+from .models import Model, ModelMetadata, SetDelta
 
 
 DYNAMIZER = Dynamizer()
@@ -563,15 +563,7 @@ class Engine(object):
         count = 0
         if atomic:
             for item in items:
-                expected = {}
-                for name in item.keys_():
-                    val = getattr(item, name)
-                    exists = val is not None
-                    expected[name] = {
-                        'Exists': exists,
-                    }
-                    if exists:
-                        expected[name]['Value'] = DYNAMIZER.encode(val)
+                expected = item.construct_ddb_expects()
                 count += 1
                 self.dynamo.delete_item(tablename, item.pk_dict_,
                                         expected=expected)
@@ -769,9 +761,17 @@ class Engine(object):
 
             # Atomic increment fields
             for name, value in item.__incrs__.iteritems():
-                # We don't need to ddb_dump because we know they're all numbers
-                data[name] = {'Action': 'ADD'}
-                data[name]['Value'] = DYNAMIZER.encode(value)
+                # We don't need to ddb_dump because we know they're all native
+                if isinstance(value, SetDelta):
+                    data[name] = {
+                        'Action': value.action,
+                        'Value': DYNAMIZER.encode(value.values),
+                    }
+                else:
+                    data[name] = {
+                        'Action': 'ADD',
+                        'Value': DYNAMIZER.encode(value),
+                    }
                 if _atomic:
                     cache_val = item.cached_(name)
                     expect = {

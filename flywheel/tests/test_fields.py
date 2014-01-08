@@ -27,13 +27,14 @@ class Widget(Model):
     }
     string = Field(hash_key=True)
     string2 = Field()
-    num = Field(data_type=NUMBER, check=lambda x: x >= 0)
+    num = Field(data_type=NUMBER)
     binary = Field(data_type=BINARY, coerce=True)
     str_set = Field(data_type=STRING_SET)
     num_set = Field(data_type=NUMBER_SET)
     bin_set = Field(data_type=BINARY_SET)
     data_dict = Field(data_type=dict)
     data_list = Field(data_type=list)
+    natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
 
     def __init__(self, **kwargs):
         self.string = 'abc'
@@ -236,25 +237,25 @@ class TestFields(BaseSystemTest):
     models = [Widget]
 
     def test_field_default(self):
-        """ If fields are not set, they default to a reasonable value """
+        """ If fields are not set, they default to None """
         w = Widget()
         self.assertIsNone(w.string2)
         self.assertIsNone(w.binary)
-        self.assertEquals(w.num, 0)
-        self.assertEquals(w.str_set, set())
-        self.assertEquals(w.num_set, set())
-        self.assertEquals(w.bin_set, set())
-        self.assertEquals(w.data_dict, {})
-        self.assertEquals(w.data_list, [])
+        self.assertIsNone(w.num)
+        self.assertIsNone(w.str_set)
+        self.assertIsNone(w.num_set)
+        self.assertIsNone(w.bin_set)
+        self.assertIsNone(w.data_dict)
+        self.assertIsNone(w.data_list)
 
     def test_valid_check(self):
         """ Widget saves if validation checks pass """
-        w = Widget(num=5)
+        w = Widget(natural_num=5)
         self.engine.save(w)
 
     def test_invalid_check(self):
         """ Widget raises error on save if validation checks fail """
-        w = Widget(num=-5)
+        w = Widget(natural_num=-5)
         with self.assertRaises(ValueError):
             self.engine.save(w)
 
@@ -285,6 +286,7 @@ class TestFields(BaseSystemTest):
     def test_set_updates(self):
         """ Sets track changes and update during sync() """
         w = Widget(string='a')
+        w.str_set = set()
         self.engine.save(w)
         w.str_set.add('hi')
         w.sync()
@@ -380,6 +382,7 @@ class TestFields(BaseSystemTest):
     def test_dict_updates(self):
         """ Dicts track changes and update during sync() """
         w = Widget(string='a')
+        w.data_dict = {}
         self.engine.save(w)
         w.data_dict['a'] = 'b'
         w.sync()
@@ -389,6 +392,7 @@ class TestFields(BaseSystemTest):
     def test_list_updates(self):
         """ Lists track changes and update during sync() """
         w = Widget(string='a')
+        w.data_list = []
         self.engine.save(w)
         w.data_list.append('a')
         w.sync()
@@ -460,24 +464,24 @@ class TestPrimitiveDataTypes(BaseSystemTest):
     models = [PrimitiveWidget]
 
     def test_field_default(self):
-        """ If fields are not set, they default to a reasonable value """
+        """ If fields are not set, they default to None """
         w = PrimitiveWidget()
         self.assertIsNone(w.string2)
         self.assertIsNone(w.binary)
-        self.assertEquals(w.num, 0)
-        self.assertEquals(w.num2, 0)
-        self.assertEquals(w.myset, set())
-        self.assertEquals(w.data, {})
-        self.assertEquals(w.wobbles, False)
-        self.assertEquals(w.friends, [])
+        self.assertIsNone(w.num)
+        self.assertIsNone(w.num2)
+        self.assertIsNone(w.myset)
+        self.assertIsNone(w.data)
+        self.assertIsNone(w.wobbles)
+        self.assertIsNone(w.friends)
         self.assertIsNone(w.created)
         self.assertIsNone(w.birthday)
-        self.assertEquals(w.price, 0)
-        self.assertTrue(isinstance(w.price, Decimal))
+        self.assertIsNone(w.price)
 
     def test_dict_updates(self):
         """ Dicts track changes and update during sync() """
         w = PrimitiveWidget(string='a')
+        w.data = {}
         self.engine.save(w)
         w.data['foo'] = 'bar'
         w.sync()
@@ -516,6 +520,7 @@ class TestPrimitiveDataTypes(BaseSystemTest):
     def test_list_updates(self):
         """ Lists track changes and update during sync() """
         w = PrimitiveWidget(string='a')
+        w.friends = []
         self.engine.save(w)
         w.friends.append('Fred')  # pylint: disable=E1101
         w.sync()

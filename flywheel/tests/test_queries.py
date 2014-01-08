@@ -14,7 +14,7 @@ class User(Model):
     }
     id = Field(hash_key=True)
     name = Field(range_key=True)
-    score = Field(data_type=NUMBER, index='score-index')
+    score = Field(data_type=NUMBER, index='score-index', default=0)
     str_set = Field(data_type=STRING_SET)
 
     def __init__(self, **kwargs):
@@ -42,8 +42,8 @@ class Post(Model):
     score = Composite('ts', 'upvotes', range_key=True, data_type=NUMBER,
                       merge=score_merge)
     username = Field()
-    ts = Field(data_type=NUMBER)
-    upvotes = Field(data_type=NUMBER)
+    ts = Field(data_type=NUMBER, default=0)
+    upvotes = Field(data_type=NUMBER, default=0)
 
     def __init__(self, **kwargs):
         for key, val in kwargs.iteritems():

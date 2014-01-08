@@ -312,6 +312,9 @@ class Field(object):
     check : callable, optional
         A function that takes the value and returns True if the value is valid
         (default None)
+    default : object, optional
+        The default value for this field that will be set when creating a model
+        (default None)
 
     Attributes
     ----------
@@ -338,7 +341,7 @@ class Field(object):
                            unicode, int, float, set, date, Decimal])
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=unicode, coerce=False, check=None):
+                 data_type=unicode, coerce=False, check=None, default=None):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         if data_type not in self.__valid_types__:
@@ -357,6 +360,7 @@ class Field(object):
         self.index_name = None
         self._boto_index = None
         self._boto_index_kwargs = None
+        self.default = default
         if index:
             self.all_index(index)
 
@@ -519,9 +523,14 @@ class Field(object):
 
     @property
     def is_mutable(self):
-        """ Return True if the data type is a set """
+        """ Return True if the data type is mutable """
         return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, dict,
                                   list, set)
+
+    @property
+    def is_set(self):
+        """ Return True if data type is a set """
+        return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set)
 
     def ddb_dump(self, value):
         """ Dump a value to its Dynamo format """
@@ -601,24 +610,6 @@ class Field(object):
         if type(val) in cls.__valid_types__:
             return type(val) in (dict, list, set)
         return True
-
-    @property
-    def default(self):
-        """ The default value for a field of this type """
-        if self.data_type in (STRING, BINARY, str, unicode):
-            return None
-        elif self.data_type in (NUMBER, int, float):
-            return 0
-        elif self.data_type == Decimal:
-            return Decimal('0')
-        elif self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set):
-            return set()
-        elif self.data_type == dict:
-            return {}
-        elif self.data_type == bool:
-            return False
-        elif self.data_type == list:
-            return []
 
     @property
     def ddb_data_type(self):

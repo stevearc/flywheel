@@ -46,12 +46,13 @@ class Post(Model):
     c_all = Composite('userid', 'id', 'about', 'text')
     score = Composite('likes', 'ts', 'deleted', data_type=NUMBER,
                       merge=lambda x, y, z: None if z else x + y)
-    likes = Field(data_type=int)
-    ts = Field(data_type=float)
-    deleted = Field(data_type=bool)
-    points = Field(data_type=Decimal)
+    likes = Field(data_type=int, default=0)
+    ts = Field(data_type=float, default=0)
+    deleted = Field(data_type=bool, default=False)
+    points = Field(data_type=Decimal, default=Decimal('0'))
     about = Field()
     text = Field()
+    tags = Field(data_type=set)
 
     def __init__(self, userid, id, ts, text='foo', about='bar'):
         self.userid = userid
@@ -451,6 +452,75 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
+
+    def test_delete_overflow_field(self):
+        """ Can delete overflow fields by setting to None """
+        p = Post('a', 'b', 0)
+        p.foobar = 'hi'
+        self.engine.save(p)
+        p.foobar = None
+        p.sync()
+
+        table = p.meta_.ddb_table(self.dynamo)
+        result = dict(list(table.scan())[0])
+        self.assertFalse('foobar' in result)
+
+    def test_atomic_add_to_set(self):
+        """ Adding a value to a set should be atomic """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p.add_(tags='a')
+        p2.add_(tags=set(['b', 'c']))
+        p.sync()
+        p2.sync()
+        self.assertEqual(p2.tags, set(['a', 'b', 'c']))
+
+    def test_atomic_add_to_set_presync(self):
+        """ Atomically adding to a set should update local model value """
+        p = Post('a', 'b', 0)
+        p.add_(tags='a')
+        self.assertEqual(p.tags, set(['a']))
+
+    def test_atomic_remove_from_set_presync(self):
+        """ Atomically removing from a set should update local model value """
+        p = Post('a', 'b', 0)
+        p.tags = set(['a', 'b', 'c'])
+        self.engine.save(p)
+        p.remove_(tags=set(['a', 'b']))
+        self.assertEqual(p.tags, set(['c']))
+
+    def test_atomic_remove_from_set(self):
+        """ Removing values from a set should be atomic """
+        p = Post('a', 'b', 0)
+        p.tags = set(['a', 'b', 'c', 'd'])
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p.remove_(tags='a')
+        p2.remove_(tags=set(['b', 'c']))
+        p.sync()
+        p2.sync()
+        self.assertEqual(p2.tags, set(['d']))
+
+    def test_atomic_set_keyerror(self):
+        """ Cannot atomically remove missing elements from set """
+        p = Post('a', 'b', 0)
+        with self.assertRaises(KeyError):
+            p.remove_(tags='a')
+
+    def test_atomic_set_one_op(self):
+        """ Can only atomically add or remove in a single update """
+        p = Post('a', 'b', 0)
+        p.add_(tags='a')
+        with self.assertRaises(ValueError):
+            p.remove_(tags='b')
+
+    def test_atomic_set_smart_one_op(self):
+        """ If atomic adds/removes cancel out, throw no error """
+        p = Post('a', 'b', 0)
+        p.add_(tags='a')
+        p.remove_(tags='a')
+        self.assertEqual(p.tags, set())
 
 
 class Store(Model):

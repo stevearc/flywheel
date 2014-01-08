@@ -86,8 +86,7 @@ installed.
 
 TODO
 ====
-* atomic add to sets
-* always make composite subfield syncs atomic
+* always make composite subfield syncs atomic (use model.construct_ddb_expected)
 * hooks for user-defined field types
 * Link to S3 for storing large items
 * Cross-table linking (One and Many)

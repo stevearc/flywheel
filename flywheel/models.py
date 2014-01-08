@@ -2,6 +2,7 @@
 import time
 
 import contextlib
+from boto.dynamodb2.types import Dynamizer
 import copy
 import inspect
 from boto.dynamodb2.fields import HashKey, RangeKey, BaseSchemaField
@@ -11,6 +12,8 @@ from collections import defaultdict
 from decimal import Decimal
 
 from .fields import Field, NUMBER
+
+DYNAMIZER = Dynamizer()
 
 
 class ValidationError(Exception):
@@ -457,6 +460,50 @@ class ModelMetadata(object):
         return None
 
 
+class SetDelta(object):
+
+    """ Wrapper for an atomic change to a Dynamo set """
+
+    def __init__(self):
+        self.action = None
+        self.values = set()
+
+    def merge(self, other):
+        """ Merge the delta with the original set value """
+        other = other or set()
+        new = set()
+        new.update(other)
+        if self.action == 'ADD':
+            new.update(self.values)
+        elif other.issuperset(self.values):
+            new.difference_update(self.values)
+        else:
+            raise KeyError("Cannot remove values that are not in the set!")
+
+        return new
+
+    def add(self, action, value):
+        """ Add another update to the delta """
+        if action not in ('ADD', 'DELETE'):
+            raise ValueError("Invalid action '%s'" % action)
+        if self.action is None:
+            self.action = action
+
+        if action == self.action:
+            if isinstance(value, set):
+                self.values.update(value)
+            else:
+                self.values.add(value)
+        else:
+            if not isinstance(value, set):
+                value = set([value])
+            if self.values.issuperset(value):
+                self.values.difference_update(value)
+            else:
+                raise ValueError("Cannot ADD and REMOVE items from the same "
+                                 "set in the same update")
+
+
 class Model(object):
 
     """
@@ -535,6 +582,9 @@ class Model(object):
                         self.__cache__[related] = cached_var
                 super(Model, self).__setattr__(name, field.coerce(value))
         else:
+            if (not self._loading and self.persisted_ and name not in
+                    self.__cache__ and Field.is_overflow_mutable(value)):
+                self.__cache__[name] = copy.copy(self.get(name))
             self._overflow[name] = value
 
     def __delattr__(self, name):
@@ -636,13 +686,49 @@ class Model(object):
             if field is not None:
                 self.__incrs__[key] = field.coerce(self.__incrs__[key], True)
                 for name in self.meta_.related_fields[key]:
-                    self.__cache__.setdefault(name, getattr(self, key))
+                    self.__cache__.setdefault(name, getattr(self, name))
                     if name != key:
                         self.__dirty__.add(name)
                 self.__dict__[key] = self.cached_(key) + self.__incrs__[key]
             else:
                 self.__cache__.setdefault(key, getattr(self, key, 0))
                 self._overflow[key] = self.cached_(key) + self.__incrs__[key]
+
+    def add_(self, **kwargs):
+        """ Atomically add to a set """
+        self.mutate_('ADD', **kwargs)
+
+    def remove_(self, **kwargs):
+        """ Atomically remove from a set """
+        self.mutate_('DELETE', **kwargs)
+
+    def mutate_(self, action, **kwargs):
+        """ Atomically mutate a set """
+        for key, val in kwargs.iteritems():
+            field = self.meta_.fields.get(key)
+            if field is not None:
+                if not field.is_set:
+                    raise ValueError("Cannot mutate non-set field '%s'" %
+                                     key)
+                if field.composite:
+                    raise ValueError("Cannot mutate composite field '%s'" %
+                                     key)
+            if key in self.__dirty__:
+                raise ValueError("Cannot set field '%s' and mutate it in "
+                                 "the same update!" % key)
+
+            previous = self.__incrs__.get(key, SetDelta())
+            previous.add(action, val)
+            self.__incrs__[key] = previous
+            if field is not None:
+                for name in self.meta_.related_fields[key]:
+                    self.__cache__.setdefault(name, getattr(self, name))
+                    if name != key:
+                        self.__dirty__.add(name)
+                self.__dict__[key] = previous.merge(self.cached_(key))
+            else:
+                self.__cache__.setdefault(key, getattr(self, key, None))
+                self._overflow[key] = previous.merge(self.cached_(key))
 
     def pre_save(self, engine):
         """ Called before saving items """
@@ -746,6 +832,24 @@ class Model(object):
             for key, val in data.items():
                 obj.set_ddb_val(key, val)
         return obj
+
+    def construct_ddb_expects(self):
+        """ Construct a dynamo "expects" mapping based on the cached fields """
+        expected = {}
+        for name in self.keys_():
+            cache_val = self.cached_(name)
+            expect = {
+                'Exists': cache_val is not None,
+            }
+            field = self.meta_.fields.get(name)
+            if field is not None:
+                cache_val = field.ddb_dump(cache_val)
+            else:
+                cache_val = Field.ddb_dump_overflow(cache_val)
+            if expect['Exists']:
+                expect['Value'] = DYNAMIZER.encode(cache_val)
+            expected[name] = expect
+        return expected
 
     def __json__(self, request=None):
         data = {}
