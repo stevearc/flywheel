@@ -162,6 +162,27 @@ BOOM.
     field that is part of a composite field, flywheel will **force** the sync
     to be atomic. This guarantees that using ``incr_()`` will always be safe.
 
+Atomic Add/Remove
+^^^^^^^^^^^^^^^^^
+DynamoDB also supports truly atomic add/remove to SET fields. To use this
+functionality, there is another special call:
+
+.. code-block:: python
+
+    >>> # Add two users to the set of tagged users
+    >>> tweet.add_(tags=set(['stevearc', 'dsa']))
+    >>> tweet.sync()
+
+And to delete:
+
+.. code-block:: python
+
+    >>> tweet.remove_(tags='stevearc')
+    >>> tweet.sync()
+
+Note than you can pass in a single value or a set of values to both ``add_``
+and ``remove_``.
+
 Default Atomic Behavior
 -----------------------
 You can configure the default behavior for each of these endpoints using

@@ -53,12 +53,11 @@ Get the top score for Galaxy Invaders::
     >>> top_score = engine.query(GameScore).filter(title='Galaxy Invaders')\
     ...     .first(desc=True)
 
-Safely increment the 'wins' count for Alien Adventure with no chance of
-failure::
+Atomically increment a user's "wins" count on Alien Adventure::
 
-    >>> score = GameScore('Alien Adventure', 'abc')
+    >>> score = self.engine.get(GameScore, userid='abc', title='Alien Adventure')
     >>> score.incr_(wins=1)
-    >>> engine.sync(score, atomic=False)
+    >>> score.sync()
 
 Get all scores on Comet Quest that are over 9000::
 
