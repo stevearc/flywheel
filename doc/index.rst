@@ -1,5 +1,10 @@
 Flywheel - Object Mapper for DynamoDB
 =====================================
+Flywheel is a library for mapping python objects to DynamoDB tables. It uses a
+SQLAlchemy-like syntax for queries.
+
+User Guide
+----------
 
 .. toctree::
     :maxdepth: 2
@@ -24,3 +29,11 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+TODO
+====
+* hooks for user-defined field types
+* release to pypi
+* rename the 'atomic' parameter to something clearer
+* Link to S3 for storing large items
+* Cross-table linking (One and Many)

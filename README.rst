@@ -82,11 +82,3 @@ require `DynamoDB Local
 There is a nose plugin that will download and run the DynamoDB Local service
 during the tests. It requires the java 6/7 runtime, so make sure you have that
 installed.
-
-TODO
-====
-* tests for sync() to make sure we don't sync unchanged fields
-* always make composite subfield syncs atomic (use model.construct_ddb_expected)
-* hooks for user-defined field types
-* Link to S3 for storing large items
-* Cross-table linking (One and Many)

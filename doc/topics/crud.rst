@@ -135,12 +135,11 @@ If you use ``sync(atomic=True)``, the sync operation will check that every
 field that you're updating has not been changed since you last read it. This is
 very useful for preventing concurrent writes.
 
-.. warning::
+.. note::
 
     If you change a key that is part of a :ref:`composite
-    field<composite_fields>`, you should **always** sync with ``atomic=True``.
-    If you don't, you run the risk of corrupting the value of the composite
-    field.
+    field<composite_fields>`, flywheel will **force** the sync to be atomic.
+    This avoids the risk of corrupting the value of the composite field.
 
 Atomic Increment
 ^^^^^^^^^^^^^^^^
@@ -156,11 +155,10 @@ this functionality, there is a special call you need to make:
 
 BOOM.
 
-.. warning::
+.. note::
 
-    Due to the weirdness with composite fields listed above, if you increment a
-    field that is part of a composite field, flywheel will **force** the sync
-    to be atomic. This guarantees that using ``incr_()`` will always be safe.
+    Incrementing a field that is part of a composite field will also force the
+    sync to be atomic.
 
 Atomic Add/Remove
 ^^^^^^^^^^^^^^^^^

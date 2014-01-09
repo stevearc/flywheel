@@ -717,19 +717,18 @@ class Engine(object):
             fields = item.__dirty__
             item.pre_save(self)
 
-            # If the model has incremented any field that is part of a
-            # composite field, FORCE the sync to be atomic. This prevents the
-            # composite key from potentially getting into an inconsistent state
-            # in the database
-            for name in item.__incrs__:
-                for related_name in item.meta_.related_fields[name]:
+            # If the model has changed any field that is part of a composite
+            # field, FORCE the sync to be atomic. This prevents the composite
+            # key from potentially getting into an inconsistent state
+            for name in itertools.chain(item.__incrs__, fields):
+                for related_name in item.meta_.related_fields.get(name, []):
                     field = item.meta_.fields[related_name]
                     if field.composite:
                         _atomic = True
                         break
 
             if _atomic:
-                expected = {}
+                expected = item.construct_ddb_expects()
             else:
                 expected = None
 
@@ -747,18 +746,6 @@ class Engine(object):
                 if action != 'DELETE':
                     data[name]['Value'] = DYNAMIZER.encode(
                         item.ddb_dump_field(name))
-                if _atomic:
-                    cache_val = item.cached_(name)
-                    expect = {
-                        'Exists': cache_val is not None,
-                    }
-                    if field is not None:
-                        cache_val = field.ddb_dump(cache_val)
-                    else:
-                        cache_val = Field.ddb_dump_overflow(cache_val)
-                    if expect['Exists']:
-                        expect['Value'] = DYNAMIZER.encode(cache_val)
-                    expected[name] = expect
 
             # Atomic increment fields
             for name, value in item.__incrs__.iteritems():
@@ -773,19 +760,12 @@ class Engine(object):
                         'Action': 'ADD',
                         'Value': DYNAMIZER.encode(value),
                     }
-                if _atomic:
-                    cache_val = item.cached_(name)
-                    expect = {
-                        'Exists': cache_val is not None and cache_val != set(),
-                    }
-                    if expect['Exists']:
-                        expect['Value'] = DYNAMIZER.encode(cache_val)
-                    expected[name] = expect
 
             key = dict([(k, DYNAMIZER.encode(v)) for k, v in
                         item.pk_dict_.iteritems()])
 
             # Perform sync
+            print "Setting values", data.keys()
             ret = self.dynamo.update_item(item.meta_.ddb_tablename, key, data,
                                           expected=expected,
                                           return_values='ALL_NEW')

@@ -541,6 +541,11 @@ class Field(object):
         """ Return True if data type is a set """
         return self.data_type in (STRING_SET, NUMBER_SET, BINARY_SET, set)
 
+    @classmethod
+    def is_null(cls, value):
+        """ Return True if the value corresponds to null inside dynamo """
+        return value is None or value == set()
+
     def ddb_dump(self, value):
         """ Dump a value to its Dynamo format """
         if value is None:

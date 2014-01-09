@@ -259,8 +259,8 @@ class TestFields(BaseSystemTest):
         with self.assertRaises(ValueError):
             self.engine.save(w)
 
-    def test_no_save_defaults(self):
-        """ Default field values are not saved to dynamo """
+    def test_save_defaults(self):
+        """ Default field values are saved to dynamo """
         w = Widget(string2='abc')
         self.engine.sync(w)
         table = w.meta_.ddb_table(self.dynamo)
@@ -268,19 +268,7 @@ class TestFields(BaseSystemTest):
         self.assertEquals(result, {
             'string': w.string,
             'string2': w.string2,
-        })
-
-    def test_sync_twice_no_defaults(self):
-        """ Syncing twice should still not save any defaults """
-        w = Widget(string2='abc')
-        self.engine.sync(w)
-        w.string2 = 'def'
-        w.sync()
-        table = w.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
-        self.assertEquals(result, {
-            'string': w.string,
-            'string2': w.string2,
+            'natural_num': 1,
         })
 
     def test_set_updates(self):

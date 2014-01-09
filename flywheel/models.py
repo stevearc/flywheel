@@ -547,10 +547,14 @@ class Model(object):
     def __new__(cls, *_, **__):
         """ Override __new__ to set default field values """
         obj = super(Model, cls).__new__(cls)
+        mark_dirty = []
         with obj.loading():
             for name, field in cls.meta_.fields.iteritems():
                 if not field.composite:
                     setattr(obj, name, field.default)
+                    if not field.is_null(field.default):
+                        mark_dirty.append(name)
+        obj.__dirty__.update(mark_dirty)
         obj._overflow = {}
         obj.persisted_ = False
         return obj
@@ -839,7 +843,7 @@ class Model(object):
         for name in self.keys_():
             cache_val = self.cached_(name)
             expect = {
-                'Exists': cache_val is not None and cache_val != set(),
+                'Exists': not Field.is_null(cache_val),
             }
             field = self.meta_.fields.get(name)
             if field is not None:

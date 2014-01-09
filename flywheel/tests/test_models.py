@@ -1,4 +1,6 @@
 """ Tests for models """
+from flywheel.engine import Engine
+from mock import patch, ANY
 import json
 from boto.dynamodb2.exceptions import ConditionalCheckFailedException
 from decimal import Decimal
@@ -127,6 +129,11 @@ class TestComposite(BaseSystemTest):
         self.engine.sync(p)
         self.assertEquals(p.score, 2)
         p.deleted = True
+
+        table = p.meta_.ddb_table(self.dynamo)
+        r = dict(list(table.scan())[0])
+        print "has keys", r.keys()
+
         p.sync()
         self.assertIsNone(p.score)
         result = self.engine(Post).filter(c_all=p.c_all)\
@@ -217,14 +224,30 @@ class TestModelMutation(BaseSystemTest):
         """ Syncing two new items with same pkey merges other fields """
         a = Article('a')
         a.author = 'me'
-        self.engine.sync(a, atomic=True)
+        self.engine.sync(a, atomic=False)
 
         a2 = Article('a')
         a2.comments = 3
-        self.engine.sync(a2, atomic=True)
+        self.engine.sync(a2, atomic=False)
 
         self.assertEquals(a2.author, 'me')
         self.assertEquals(a2.comments, 3)
+
+    def test_sync_only_updates_changed(self):
+        """ Sync only updates fields that have been changed """
+        with patch.object(self.engine, 'dynamo') as dynamo:
+            p = Post('a', 'b', 4)
+            self.engine.save(p)
+            p.foobar = set('a')
+            p.points = Decimal('2')
+            p.sync()
+            data = {
+                'foobar': ANY,
+                'points': ANY,
+            }
+            dynamo.update_item.assert_called_with(ANY, ANY, data,
+                                                  expected=None,
+                                                  return_values=ANY)
 
     def test_delete(self):
         """ Model can delete itself """

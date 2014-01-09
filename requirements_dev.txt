@@ -5,3 +5,4 @@ tox
 nose
 sphinx
 numpydoc
+mock
