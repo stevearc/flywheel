@@ -5,6 +5,7 @@ except ImportError:
     __version__ = 'unknown'
 
 import boto.dynamodb.types
+from boto.dynamodb.types import Binary
 from boto.dynamodb2.types import (STRING, NUMBER, BINARY, STRING_SET,
                                   NUMBER_SET, BINARY_SET)
 from decimal import Inexact, Rounded, Decimal
@@ -25,6 +26,6 @@ def float_to_decimal(f):
 boto.dynamodb.types.float_to_decimal = float_to_decimal
 
 
-from .fields import Field, Composite, GlobalIndex
+from .fields import Field, Composite, GlobalIndex, TypeDefinition
 from .models import Model
 from .engine import Engine

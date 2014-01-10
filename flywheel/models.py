@@ -677,7 +677,7 @@ class Model(object):
 
             field = self.meta_.fields.get(key)
             if field is not None:
-                if field.data_type not in (NUMBER, int, float, Decimal):
+                if field.ddb_data_type != NUMBER:
                     raise ValueError("Cannot increment non-number field '%s'" %
                                      key)
                 if field.composite:

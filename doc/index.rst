@@ -32,8 +32,9 @@ Indices and tables
 
 TODO
 ====
-* hooks for user-defined field types
-* release to pypi
+* reorganize models code into smaller files
+* add better comments
 * rename the 'atomic' parameter to something clearer
+* release to pypi
 * Link to S3 for storing large items
 * Cross-table linking (One and Many)

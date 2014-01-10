@@ -428,7 +428,7 @@ class TestFilterFields(BaseSystemTest):
         w = Widget(count=5)
         self.engine.save(w)
         ret = self.engine.scan(Widget)\
-            .filter(Widget.count.between_(4, 6)).first()
+            .filter(Widget.count.betwixt_(4, 6)).first()
         self.assertEquals(w, ret)
 
     def test_contains_int(self):
@@ -829,7 +829,7 @@ class TestFilterFields(BaseSystemTest):
         d = {'foo': 'bar'}
         w = Widget(data=d)
         self.engine.save(w)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             self.engine.scan(Widget).filter(Widget.data.in_(d)).all()
 
     def test_beginswith_dict(self):

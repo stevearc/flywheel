@@ -2,11 +2,13 @@
 from datetime import datetime, date
 
 import json
+import zlib
 from decimal import Decimal
 
 from . import BaseSystemTest
-from flywheel import (Field, Model, NUMBER, BINARY, STRING_SET, NUMBER_SET,
-                      BINARY_SET, GlobalIndex)
+from flywheel import (Field, Model, NUMBER, BINARY, STRING_SET,
+                      NUMBER_SET, BINARY_SET, Binary, GlobalIndex)
+from flywheel.fields.types import DictType, register_type
 
 
 try:
@@ -15,6 +17,22 @@ except ImportError:
     import unittest
 
 # pylint: disable=E1101
+
+
+class CompressedDict(DictType):
+
+    """ Custom field type that compresses data """
+    data_type = 'zdict'
+    ddb_data_type = BINARY
+
+    def ddb_dump(self, value):
+        return Binary(zlib.compress(json.dumps(value)))
+
+    def ddb_load(self, value):
+        return json.loads(zlib.decompress(value.value))
+
+
+register_type(CompressedDict)
 
 
 class Widget(Model):
@@ -34,6 +52,7 @@ class Widget(Model):
     bin_set = Field(data_type=BINARY_SET)
     data_dict = Field(data_type=dict)
     data_list = Field(data_type=list)
+    bigdata = Field(data_type=CompressedDict)
     natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
 
     def __init__(self, **kwargs):
@@ -70,6 +89,12 @@ class TestCreateFields(unittest.TestCase):
         """ Cannot index the range key """
         with self.assertRaises(ValueError):
             Field(range_key=True, index='r-index')
+
+    def test_create_custom_type(self):
+        """ Can create a field with a custom data type """
+        Field(data_type='zdict')
+        Field(data_type=CompressedDict)
+        Field(data_type=CompressedDict())
 
 
 class TestFieldCoerce(unittest.TestCase):
@@ -115,9 +140,9 @@ class TestFieldCoerce(unittest.TestCase):
     def test_int_no_data_loss(self):
         """ Int fields refuse to drop floating point data """
         field = Field(data_type=int, coerce=True)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             field.coerce(4.5)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             field.coerce(Decimal('4.5'))
 
     def test_int_coerce(self):
@@ -247,6 +272,7 @@ class TestFields(BaseSystemTest):
         self.assertEquals(w.bin_set, set())
         self.assertIsNone(w.data_dict)
         self.assertIsNone(w.data_list)
+        self.assertIsNone(w.bigdata)
 
     def test_valid_check(self):
         """ Widget saves if validation checks pass """
@@ -430,6 +456,13 @@ class TestFields(BaseSystemTest):
         self.engine.sync(w)
         stored_widget = self.engine.scan(Widget).first()
         self.assertEqual(stored_widget.str_set, set())
+
+    def test_custom_field(self):
+        """ Can save and load a custom field type """
+        w = Widget(bigdata={'a': 1})
+        self.engine.save(w)
+        stored_widget = self.engine.scan(Widget).first()
+        self.assertEqual(stored_widget.bigdata, {'a': 1})
 
 
 class PrimitiveWidget(Model):
