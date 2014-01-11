@@ -151,11 +151,7 @@ class Query(object):
         if meta.range_key is not None:
             attrs.append(meta.range_key.name)
         results = self.gen(attributes=attrs)
-        # TODO: uncomment this line once boto API supports passing 'attributes'
-        # to Table.scan()
-        # return self.engine.delete_key(self.model, results)
-        return self.engine._delete_items(self.model.meta_.ddb_tablename,
-                                         results, atomic=False)
+        return self.engine.delete_key(self.model, results)
 
     def filter(self, *conditions, **kwargs):
         """
@@ -217,10 +213,6 @@ class Scan(Query):
         if consistent:
             raise ValueError("Cannot force consistent read on scan()")
         kwargs = self.condition.scan_kwargs()
-
-        # TODO: delete this line to make scan deletes more efficient once
-        # boto API supports passing 'attributes' to Table.scan()
-        attributes = None
 
         if attributes is not None:
             kwargs['attributes'] = attributes
@@ -555,28 +547,24 @@ class Engine(object):
         for item in items:
             tables[item.meta_.ddb_tablename].append(item)
 
-        for tablename, items in tables.iteritems():
-            self._delete_items(tablename, items, atomic)
-
-    def _delete_items(self, tablename, items, atomic):
-        """ Delete items from a single table """
         count = 0
-        if atomic:
-            for item in items:
-                expected = item.construct_ddb_expects()
-                count += 1
-                self.dynamo.delete_item(tablename, item.pk_dict_,
-                                        expected=expected)
-        else:
-            table = Table(tablename, connection=self.dynamo)
-            with table.batch_write() as batch:
+        for tablename, items in tables.iteritems():
+            if atomic:
                 for item in items:
-                    if isinstance(item, Model):
-                        keys = item.pk_dict_
-                    else:
-                        keys = dict(item)
+                    expected = item.construct_ddb_expects()
                     count += 1
-                    batch.delete_item(**keys)
+                    self.dynamo.delete_item(tablename, item.pk_dict_,
+                                            expected=expected)
+            else:
+                table = Table(tablename, connection=self.dynamo)
+                with table.batch_write() as batch:
+                    for item in items:
+                        if isinstance(item, Model):
+                            keys = item.pk_dict_
+                        else:
+                            keys = dict(item)
+                        count += 1
+                        batch.delete_item(**keys)
         return count
 
     def save(self, items, overwrite=None):
