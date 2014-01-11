@@ -32,7 +32,6 @@ Indices and tables
 
 TODO
 ====
-* reorganize models code into smaller files
 * add better comments
 * rename the 'atomic' parameter to something clearer
 * release to pypi
