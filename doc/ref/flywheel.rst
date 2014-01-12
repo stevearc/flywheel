@@ -6,6 +6,7 @@ Subpackages
 
 .. toctree::
 
+    flywheel.fields
     flywheel.tests
 
 Submodules
@@ -14,7 +15,7 @@ Submodules
 .. toctree::
 
    flywheel.engine
-   flywheel.fields
+   flywheel.model_meta
    flywheel.models
 
 Module contents

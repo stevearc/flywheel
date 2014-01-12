@@ -26,7 +26,9 @@ application-level constraint on the data. Each option works transparently, so a
 against it using other ``datetime``'s.
 
 Below is a table of python types, how they are stored in DynamoDB, and any
-special notes.
+special notes. For more information, the code for data types is located at
+:mod:`~flywheel.fields.types`.
+
 
 +----------+-------------+---------------------------------------------------------------+
 | Type     | Dynamo Type | Description                                                   |
@@ -53,6 +55,8 @@ special notes.
 +----------+-------------+---------------------------------------------------------------+
 | list     | STRING      | Stored as json-encoded string                                 |
 +----------+-------------+---------------------------------------------------------------+
+| S3Type   | STRING      | Stores the S3 key path as a string                            |
++----------+-------------+---------------------------------------------------------------+
 
 If you attempt to set a field with a type that doesn't match, it will raise a
 ``ValueError``.  If a field was created with ``coerce=True`` it will first
@@ -72,8 +76,45 @@ without being explicitly told to. This has the following effect:
 
     >>> class Game(Model):
     ...    title = Field(hash_key=True)
-    ...    pionts = Field(data_type=int, coerce=True)
+    ...    points = Field(data_type=int, coerce=True)
 
     >>> mygame = Game()
     >>> mygame.points = 1.8
     ValueError: Field 'points' refusing to convert 1.8 to int! Results in data loss!
+
+Advanced Types
+--------------
+
+S3 Keys
+^^^^^^^
+You can use :class:`~flywheel.fields.types.S3Type` to quickly and easily
+reference S3 values from your model objects. This type will store the S3 key in
+Dynamo and put a :class:`~boto.s3.key.Key` object in your model.
+
+.. code-block:: python
+
+    from flywheel.fields.types import S3Type
+
+    class Image(Model):
+        user = Field(hash_key=True)
+        name = Field(range_key=True)
+        taken = Field(data_type=datetime, index='taken-index')
+        data = Composite('user', 'name', data_type=S3Type('my_image_bucket'),
+                         merge=lambda *a: '/'.join(a))
+
+        def __init__(self, user, name, taken):
+            self.user = user
+            self.name = name
+            self.taken = taken
+
+You can use this class like so:
+
+.. code-block:: python
+
+    >>> img = Image('Rob', 'Big Sur.jpg', datetime.utcnow())
+    >>> img.data.set_contents_from_filename(img.name)
+    >>> engine.save(img)
+
+It will store the image data in the S3 bucket named ``my_image_bucket`` and use
+the path ``Rob/Big Sur.jpg``. See :ref:`composite_fields` for more about how
+the key path is generated.

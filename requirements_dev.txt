@@ -6,3 +6,4 @@ nose
 sphinx
 numpydoc
 mock
+moto

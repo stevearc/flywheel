@@ -6,9 +6,10 @@ import zlib
 from decimal import Decimal
 
 from . import BaseSystemTest
-from flywheel import (Field, Model, NUMBER, BINARY, STRING_SET,
+from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex)
-from flywheel.fields.types import DictType, register_type
+from flywheel.fields.types import DictType, S3Type, Key, register_type
+from moto import mock_s3
 
 
 try:
@@ -54,6 +55,8 @@ class Widget(Model):
     data_list = Field(data_type=list)
     bigdata = Field(data_type=CompressedDict)
     natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
+    s3data = Composite('string', 'string2', data_type=S3Type('mybucket'),
+                       merge=lambda *a: '/'.join([x or '' for x in a]))
 
     def __init__(self, **kwargs):
         self.string = 'abc'
@@ -255,6 +258,14 @@ class TestFieldCoerce(unittest.TestCase):
         with self.assertRaises(TypeError):
             field.coerce(12345)
 
+    @mock_s3
+    def test_coerce_s3key(self):
+        """ Coerce to S3 key """
+        field = Field(data_type=S3Type('mybucket'), coerce=True)
+        ret = field.coerce('my/path')
+        self.assertTrue(isinstance(ret, Key))
+        self.assertEqual(ret.key, 'my/path')
+
 
 class TestFields(BaseSystemTest):
 
@@ -295,6 +306,7 @@ class TestFields(BaseSystemTest):
             'string': w.string,
             'string2': w.string2,
             'natural_num': 1,
+            's3data': w.string + '/' + w.string2,
         })
 
     def test_set_updates(self):
@@ -463,6 +475,20 @@ class TestFields(BaseSystemTest):
         self.engine.save(w)
         stored_widget = self.engine.scan(Widget).first()
         self.assertEqual(stored_widget.bigdata, {'a': 1})
+
+    @mock_s3
+    def test_s3_data(self):
+        """ Can save and retrieve S3 data """
+        import boto
+        conn = boto.connect_s3()
+        conn.create_bucket('mybucket')
+        w = Widget(string='a', string2='b')
+        w.s3data.set_contents_from_string('data')
+        self.engine.save(w)
+        stored_widget = self.engine.scan(Widget).first()
+        self.assertEqual(stored_widget.s3data.key, 'a/b')
+        data = stored_widget.s3data.get_contents_as_string()
+        self.assertEqual(data, 'data')
 
 
 class PrimitiveWidget(Model):

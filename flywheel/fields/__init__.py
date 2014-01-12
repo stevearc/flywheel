@@ -437,4 +437,4 @@ class Composite(Field):
             return super(Composite, self).resolve(obj, scope)
         args = [self.model.meta_.fields[f].resolve(obj, scope) for f in
                 self.subfields]
-        return self.merge(*args)
+        return self.coerce(self.merge(*args))

@@ -2,6 +2,7 @@
 import datetime
 
 import json
+import boto.s3.key
 from boto.dynamodb.types import Binary, float_to_decimal
 from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
                                   STRING_SET, BINARY_SET)
@@ -389,3 +390,103 @@ class DateType(TypeDefinition):
         return datetime.date.fromtimestamp(value)
 
 register_type(DateType)
+
+
+class Key(boto.s3.key.Key):
+
+    """ Subclass of boto S3 key that adds equality operators """
+
+    def __hash__(self):
+        return hash(self.key)
+
+    def __eq__(self, other):
+        return self.key == getattr(other, 'key', None)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class S3Type(TypeDefinition):
+
+    """
+    Store a link to an S3 key
+
+    Parameters
+    ----------
+    bucket : str
+        The name of the S3 bucket
+    scheme : str, optional
+        The name of the scheme to use to connect to S3 if the bucket is a
+        string. (default 'default'). See :meth:`~.set_scheme` for more
+        information.
+
+    """
+    ddb_data_type = STRING
+    mutable = True
+    SCHEMES = {
+        'default': {},
+    }
+    _connections = {}
+
+    def __init__(self, bucket, scheme='default'):
+        super(S3Type, self).__init__()
+        self._bucket_name = bucket
+        self._bucket = None
+        self._scheme = scheme
+
+    @property
+    def bucket(self):
+        """ Getter for S3 bucket """
+        if self._bucket is None:
+            self._bucket = self._get_bucket(self._bucket_name, self._scheme)
+        return self._bucket
+
+    @classmethod
+    def _get_bucket(cls, bucket, scheme):
+        """ Get a connection to an S3 bucket """
+        if scheme not in cls.SCHEMES:
+            raise KeyError("Could not find S3 connection scheme '%s'. "
+                           "Have you registered it with S3Type.set_scheme?"
+                           % scheme)
+        if scheme not in cls._connections:
+            cls._connections[scheme] = boto.connect_s3(**cls.SCHEMES[scheme])
+        return cls._connections[scheme].get_bucket(bucket, validate=False)
+
+    @classmethod
+    def set_scheme(cls, name, **kwargs):
+        """
+        Register a S3 connection scheme
+
+        The connection scheme is a collection of keyword arguments that will be
+        passed to :meth:`~boto.connect_s3` when creating a S3 connection.
+
+        Parameters
+        ----------
+        name : str
+            The name of the scheme. If the name is 'default', then that scheme
+            will be used when no scheme is explicitly passed to the
+            constructor.
+        **kwargs : dict
+            All keyword arguments
+
+        """
+        cls.SCHEMES[name] = kwargs
+
+    def coerce(self, value, force):
+        """ S3Type will auto-coerce string types """
+        if not isinstance(value, Key):
+            if force or isinstance(value, basestring):
+                key = Key(self.bucket)
+                key.key = value
+                return key
+            else:
+                raise TypeError()
+        return value
+
+    def ddb_dump(self, value):
+        return value.key
+
+    def ddb_load(self, value):
+        key = Key(self.bucket)
+        key.key = value
+        return key

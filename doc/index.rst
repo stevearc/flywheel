@@ -35,5 +35,5 @@ TODO
 * add better comments
 * rename the 'atomic' parameter to something clearer
 * release to pypi
-* Link to S3 for storing large items
 * Cross-table linking (One and Many)
+* Sets of other data types (e.g. dates)
