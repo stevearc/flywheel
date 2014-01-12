@@ -206,9 +206,9 @@ class Model(object):
         field = self.meta_.fields.get(name)
         if field is not None:
             if not field.composite:
-                super(Model, self).__delattr__(name)
+                setattr(self, name, None)
         else:
-            del self._overflow[name]
+            setattr(self, name, None)
 
     def __getattribute__(self, name):
         if not name.startswith('_') and not name.endswith('_'):
@@ -290,11 +290,11 @@ class Model(object):
             field = self.meta_.fields.get(key)
             if field is not None:
                 if field.ddb_data_type != NUMBER:
-                    raise ValueError("Cannot increment non-number field '%s'" %
-                                     key)
+                    raise TypeError("Cannot increment non-number field '%s'" %
+                                    key)
                 if field.composite:
-                    raise ValueError("Cannot increment composite field '%s'" %
-                                     key)
+                    raise TypeError("Cannot increment composite field '%s'" %
+                                    key)
             if key in self.__dirty__:
                 raise ValueError("Cannot set field '%s' and increment it in "
                                  "the same update!" % key)
@@ -324,11 +324,11 @@ class Model(object):
             field = self.meta_.fields.get(key)
             if field is not None:
                 if not field.is_set:
-                    raise ValueError("Cannot mutate non-set field '%s'" %
-                                     key)
+                    raise TypeError("Cannot mutate non-set field '%s'" %
+                                    key)
                 if field.composite:
-                    raise ValueError("Cannot mutate composite field '%s'" %
-                                     key)
+                    raise TypeError("Cannot mutate composite field '%s'" %
+                                    key)
             if key in self.__dirty__:
                 raise ValueError("Cannot set field '%s' and mutate it in "
                                  "the same update!" % key)
@@ -381,7 +381,7 @@ class Model(object):
                 value = self.get_(name)
                 if Field.is_overflow_mutable(value):
                     self.__cache__[name] = copy.copy(value)
-            elif field.is_mutable:
+            elif not field.composite and field.is_mutable:
                 self.__cache__[name] = copy.copy(getattr(self, name))
 
     @contextlib.contextmanager

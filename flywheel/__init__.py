@@ -1,7 +1,7 @@
 """ flywheel """
 try:
     from ._version import *  # pylint: disable=F0401,W0401
-except ImportError:
+except ImportError:  # pragma: no cover
     __version__ = 'unknown'
 
 import boto.dynamodb.types
@@ -16,7 +16,7 @@ boto.dynamodb.types.DYNAMODB_CONTEXT.traps[Inexact] = False
 boto.dynamodb.types.DYNAMODB_CONTEXT.traps[Rounded] = False
 
 
-def float_to_decimal(f):
+def float_to_decimal(f):  # pragma: no cover
     """ Monkey-patched replacement for boto's broken version """
     n, d = f.as_integer_ratio()
     numerator, denominator = Decimal(n), Decimal(d)

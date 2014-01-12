@@ -273,15 +273,6 @@ class ModelMetadata(object):
         """ Construct the primary key value """
         return self.hash_key.resolve(obj, scope)
 
-    def pk(self, obj=None, scope=None):
-        """ Get the concatenated primary key for an item """
-        hk = self.hk(obj, scope)
-        rk = self.rk(obj, scope)
-        if rk is not None:
-            return "%s:%s" % (hk, rk)
-        else:
-            return hk
-
     def pk_dict(self, obj=None, scope=None, ddb_dump=False):
         """ Get the dynamo primary key dict for an item """
         # If we can unambiguously tell that a single string defines the primary

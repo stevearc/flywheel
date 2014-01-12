@@ -103,16 +103,6 @@ class GlobalIndex(object):
         if self.range_key is not None:
             yield self.range_key
 
-    def __hash__(self):
-        return hash(self.name)
-
-    def __eq__(self, other):
-        return (self.name == other.name and self.hash_key == other.hash_key and
-                self.range_key == other.range_key)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     def __repr__(self):
         if self.range_key is None:
             return "GlobalIndex('%s', '%s')" % (self.name, self.hash_key)

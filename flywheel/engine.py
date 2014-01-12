@@ -542,7 +542,6 @@ class Engine(object):
                         item.pk_dict_.iteritems()])
 
             # Perform sync
-            print "Setting values", data.keys()
             ret = self.dynamo.update_item(item.meta_.ddb_tablename, key, data,
                                           expected=expected,
                                           return_values='ALL_NEW')

@@ -55,6 +55,8 @@ class Post(Model):
     about = Field()
     text = Field()
     tags = Field(data_type=set)
+    keywords = Composite('text', 'about', data_type=set,
+                         merge=lambda t, a: t.split() + a.split(), coerce=True)
 
     def __init__(self, userid, id, ts, text='foo', about='bar'):
         self.userid = userid
@@ -132,7 +134,6 @@ class TestComposite(BaseSystemTest):
 
         table = p.meta_.ddb_table(self.dynamo)
         r = dict(list(table.scan())[0])
-        print "has keys", r.keys()
 
         p.sync()
         self.assertIsNone(p.score)
@@ -476,6 +477,27 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
 
+    def test_no_incr_primary_key(self):
+        """ Cannot increment a primary key """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        with self.assertRaises(AttributeError):
+            p.incr_(userid=4)
+
+    def test_no_incr_string(self):
+        """ Cannot increment a string """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        with self.assertRaises(TypeError):
+            p.incr_(text='hi')
+
+    def test_no_incr_composite(self):
+        """ Cannot increment a composite field """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        with self.assertRaises(TypeError):
+            p.incr_(score=4)
+
     def test_delete_overflow_field(self):
         """ Can delete overflow fields by setting to None """
         p = Post('a', 'b', 0)
@@ -516,6 +538,24 @@ class TestModelMutation(BaseSystemTest):
         p.add_(tags='a')
         self.assertEqual(p.tags, set(['a']))
 
+    def test_no_add_string(self):
+        """ Cannot add_ to string fields """
+        p = Post('a', 'b', 0)
+        with self.assertRaises(TypeError):
+            p.add_(about='something')
+
+    def test_no_add_number(self):
+        """ Cannot add_ to number fields """
+        p = Post('a', 'b', 0)
+        with self.assertRaises(TypeError):
+            p.add_(likes=4)
+
+    def test_no_add_composite(self):
+        """ Cannot add_ to composite fields """
+        p = Post('a', 'b', 0)
+        with self.assertRaises(TypeError):
+            p.add_(keywords=4)
+
     def test_atomic_remove_from_set_presync(self):
         """ Atomically removing from a set should update local model value """
         p = Post('a', 'b', 0)
@@ -555,6 +595,31 @@ class TestModelMutation(BaseSystemTest):
         p.add_(tags='a')
         p.remove_(tags='a')
         self.assertEqual(p.tags, set())
+
+    def test_delattr_field(self):
+        """ Deleting a field sets it to None and deletes it from Dynamo """
+        a = Article(publication='The Onion')
+        self.engine.save(a)
+        del a.text
+        a.sync()
+        stored_a = self.engine.scan(Article).first()
+        self.assertIsNone(stored_a.text)
+
+    def test_delattr_overflow_field(self):
+        """ Deleting a field deletes it from Dynamo """
+        a = Article(publication='The Onion')
+        self.engine.save(a)
+        del a.publication
+        a.sync()
+        stored_a = self.engine.scan(Article).first()
+        self.assertIsNone(stored_a.get_('publication'))
+
+    def test_delattr_private_field(self):
+        """ Deleting a private field works like normal """
+        a = Article()
+        a._foobar = 'foobar'
+        del a._foobar
+        self.assertFalse(hasattr(a, '_foobar'))
 
 
 class Store(Model):

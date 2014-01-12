@@ -404,6 +404,8 @@ class Composite(Field):
         The dynamo data type. Valid values are (NUMBER, STRING, BINARY,
         NUMBER_SET, STRING_SET, BINARY_SET, dict, list, bool, str, unicode,
         int, float, set, datetime, date, Decimal) (default unicode)
+    coerce : bool, optional
+        Attempt to coerce the value if it's the incorrect type (default False)
     check : callable, optional
         A function that takes the value and returns True if the value is valid
         (default None)
@@ -419,7 +421,7 @@ class Composite(Field):
             self.merge = lambda *args: ':'.join(args)
         unrecognized = (set(kwargs.keys()) -
                         set(['range_key', 'index', 'hash_key', 'data_type',
-                             'check', ]))
+                             'check', 'coerce']))
         if unrecognized:
             raise TypeError("Unrecognized keyword args: %s" % unrecognized)
         if len(args) < 2:
