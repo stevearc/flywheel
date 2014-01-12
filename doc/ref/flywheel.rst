@@ -17,6 +17,7 @@ Submodules
    flywheel.engine
    flywheel.model_meta
    flywheel.models
+   flywheel.query
 
 Module contents
 ---------------
