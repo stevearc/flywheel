@@ -12,14 +12,28 @@ DYNAMIZER = Dynamizer()
 
 class SetDelta(object):
 
-    """ Wrapper for an atomic change to a Dynamo set """
+    """
+    Wrapper for an atomic change to a Dynamo set
+
+    Used to track the changes when using :meth:`~.Model.add_` and
+    :meth:`~.Model.remove_`
+
+    """
 
     def __init__(self):
         self.action = None
         self.values = set()
 
     def merge(self, other):
-        """ Merge the delta with the original set value """
+        """
+        Merge the delta with a set
+
+        Parameters
+        ----------
+        other : set
+            The original set to merge the changes with
+
+        """
         other = other or set()
         new = set()
         new.update(other)
@@ -33,7 +47,16 @@ class SetDelta(object):
         return new
 
     def add(self, action, value):
-        """ Add another update to the delta """
+        """
+        Add another update to the delta
+
+        Parameters
+        ----------
+        action : {'ADD', 'DELETE'}
+        value : object
+            The value to add or remove
+
+        """
         if action not in ('ADD', 'DELETE'):
             raise ValueError("Invalid action '%s'" % action)
         if self.action is None:
@@ -62,19 +85,61 @@ class Model(object):
     For documentation on the metadata fields, check the attributes on the
     :class:`.ModelMetadata` class.
 
+    Attributes
+    ----------
+    __metadata_class__ : class
+        The class that is instantiated and set as ``meta_``
+    __metadata__ : dict
+        For details see :ref:`metadata`
+    meta_ : :class:`~.ModelMetadata`
+        The metadata for the model
+    __engine__ : :class:`~flywheel.engine.Engine`
+        Cached copy of the Engine that was used to save/load the model. This
+        will be set after saving or loading a model.
+    __dirty__ : set
+        The set of all immutable fields that have been changed since the last
+        save operation.
+    __cache__ : dict
+        The last seen value that was stored in the database. This is used to
+        construct the ``expects`` dict when making atomic updates.
+    __incrs__ : dict
+        Mapping of fields to atomic add/delete operations for numbers and sets.
+
     """
-    __abstract__ = True
     __metaclass__ = ModelMetaclass
     __metadata_class__ = ModelMetadata
-    __metadata__ = {}
+    __metadata__ = {
+        '_abstract': True,
+    }
     meta_ = None
-    persisted_ = False
     __engine__ = None
-    _overflow = None
     __dirty__ = None
     __cache__ = None
     __incrs__ = None
+    # dict of all undeclared fields that have been set
+    _overflow = None
+    _persisted = False
     _loading = False
+
+    def refresh(self, consistent=False):
+        """ Overwrite model data with freshest from database """
+        if self.__engine__ is None:
+            raise ValueError("Cannot sync: No DB connection")
+
+        self.__engine__.refresh(self, consistent=consistent)
+
+    def sync(self, atomic=False):
+        """ Sync model changes back to database """
+        if self.__engine__ is None:
+            raise ValueError("Cannot sync: No DB connection")
+
+        self.__engine__.sync(self, atomic=atomic)
+
+    def delete(self, atomic=False):
+        """ Delete the model from the database """
+        if self.__engine__ is None:
+            raise ValueError("Cannot delete: No DB connection")
+        self.__engine__.delete(self, atomic=atomic)
 
     @classmethod
     def __on_create__(cls):
@@ -86,19 +151,11 @@ class Model(object):
         """ Called after class is constructed and after meta_ is set """
         pass
 
-    @classmethod
-    def field_(cls, name):
-        """ Construct a placeholder Field for an undeclared field """
-        field = Field()
-        field.name = name
-        field.overflow = True
-        return field
-
     def __new__(cls, *_, **__):
         """ Override __new__ to set default field values """
         obj = super(Model, cls).__new__(cls)
         mark_dirty = []
-        with obj.loading():
+        with obj.loading_():
             for name, field in cls.meta_.fields.iteritems():
                 if not field.composite:
                     setattr(obj, name, field.default)
@@ -106,7 +163,7 @@ class Model(object):
                         mark_dirty.append(name)
         obj.__dirty__.update(mark_dirty)
         obj._overflow = {}
-        obj.persisted_ = False
+        obj._persisted = False
         return obj
 
     def __setattr__(self, name, value):
@@ -138,7 +195,7 @@ class Model(object):
         else:
             if (not self._loading and self.persisted_ and name not in
                     self.__cache__ and Field.is_overflow_mutable(value)):
-                self.__cache__[name] = copy.copy(self.get(name))
+                self.__cache__[name] = copy.copy(self.get_(name))
             self._overflow[name] = value
 
     def __delattr__(self, name):
@@ -185,7 +242,7 @@ class Model(object):
         else:
             self.__dirty__.add(name)
 
-    def get(self, name, default=None):
+    def get_(self, name, default=None):
         """ Dict-style getter for overflow attrs """
         return self._overflow.get(name, default)
 
@@ -203,6 +260,11 @@ class Model(object):
     def pk_dict_(self):
         """ The primary key dict, encoded for dynamo """
         return self.meta_.pk_dict(self, ddb_dump=True)
+
+    @property
+    def persisted_(self):
+        """ True if the model exists in DynamoDB, False otherwise """
+        return self._persisted
 
     def keys_(self):
         """ All declared fields and any additional fields """
@@ -284,7 +346,7 @@ class Model(object):
                 self.__cache__.setdefault(key, getattr(self, key, None))
                 self._overflow[key] = previous.merge(self.cached_(key))
 
-    def pre_save(self, engine):
+    def pre_save_(self, engine):
         """ Called before saving items """
         self.__engine__ = engine
         for field in self.meta_.fields.itervalues():
@@ -294,38 +356,18 @@ class Model(object):
                     raise ValueError("Validation check on field %s failed "
                                      "for value %s" % (field.name, val))
 
-    def post_save(self):
+    def post_save_(self):
         """ Called after item is saved to database """
-        self.persisted_ = True
+        self._persisted = True
         self.__dirty__ = set()
         self.__incrs__ = {}
         self._reset_cache()
 
-    def refresh(self, consistent=False):
-        """ Overwrite model data with freshest from database """
-        if self.__engine__ is None:
-            raise ValueError("Cannot sync: No DB connection")
-
-        self.__engine__.refresh(self, consistent=consistent)
-
-    def sync(self, atomic=False):
-        """ Sync model changes back to database """
-        if self.__engine__ is None:
-            raise ValueError("Cannot sync: No DB connection")
-
-        self.__engine__.sync(self, atomic=atomic)
-
-    def delete(self, atomic=False):
-        """ Delete the model from the database """
-        if self.__engine__ is None:
-            raise ValueError("Cannot delete: No DB connection")
-        self.__engine__.delete(self, atomic=atomic)
-
-    def post_load(self, engine):
+    def post_load_(self, engine):
         """ Called after model loaded from database """
         if engine is not None:
             self.__engine__ = engine
-        self.persisted_ = True
+        self._persisted = True
         self.__dirty__ = set()
         self.__incrs__ = {}
         self._reset_cache()
@@ -336,22 +378,22 @@ class Model(object):
         for name in self.keys_():
             field = self.meta_.fields.get(name)
             if field is None:
-                value = self.get(name)
+                value = self.get_(name)
                 if Field.is_overflow_mutable(value):
                     self.__cache__[name] = copy.copy(value)
             elif field.is_mutable:
                 self.__cache__[name] = copy.copy(getattr(self, name))
 
     @contextlib.contextmanager
-    def loading(self, engine=None):
+    def loading_(self, engine=None):
         """ Context manager to speed up object load process """
         self._loading = True
         self._overflow = {}
         yield
         self._loading = False
-        self.post_load(engine)
+        self.post_load_(engine)
 
-    def ddb_dump_field(self, name):
+    def ddb_dump_field_(self, name):
         """ Dump a field to a Dynamo-friendly value """
         val = getattr(self, name)
         if name in self.meta_.fields:
@@ -359,17 +401,17 @@ class Model(object):
         else:
             return Field.ddb_dump_overflow(val)
 
-    def ddb_dump(self):
+    def ddb_dump_(self):
         """ Return a dict for inserting into DynamoDB """
         data = {}
         for name in self.meta_.fields:
-            data[name] = self.ddb_dump_field(name)
+            data[name] = self.ddb_dump_field_(name)
         for name in self._overflow:
-            data[name] = self.ddb_dump_field(name)
+            data[name] = self.ddb_dump_field_(name)
 
         return data
 
-    def set_ddb_val(self, key, val):
+    def set_ddb_val_(self, key, val):
         """ Decode and set a value retrieved from Dynamo """
         if key.startswith('_'):
             pass
@@ -379,15 +421,15 @@ class Model(object):
             setattr(self, key, Field.ddb_load_overflow(val))
 
     @classmethod
-    def ddb_load(cls, engine, data):
+    def ddb_load_(cls, engine, data):
         """ Load a model from DynamoDB data """
         obj = cls.__new__(cls)
-        with obj.loading(engine):
+        with obj.loading_(engine):
             for key, val in data.items():
-                obj.set_ddb_val(key, val)
+                obj.set_ddb_val_(key, val)
         return obj
 
-    def construct_ddb_expects(self):
+    def construct_ddb_expects_(self):
         """ Construct a dynamo "expects" mapping based on the cached fields """
         expected = {}
         for name in self.keys_():
@@ -404,6 +446,20 @@ class Model(object):
                 expect['Value'] = DYNAMIZER.encode(cache_val)
             expected[name] = expect
         return expected
+
+    @classmethod
+    def field_(cls, name):
+        """
+        Construct a placeholder Field for an undeclared field
+
+        This is used for creating scan filter constraints on fields that were
+        not declared in the model
+
+        """
+        field = Field()
+        field.name = name
+        field.overflow = True
+        return field
 
     def __json__(self, request=None):
         data = {}

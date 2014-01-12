@@ -248,7 +248,7 @@ class Engine(object):
 
         table = model.meta_.ddb_table(self.dynamo)
         raw_items = table.batch_get(keys=keys, consistent=consistent)
-        items = [model.ddb_load(self, raw_item) for raw_item in raw_items]
+        items = [model.ddb_load_(self, raw_item) for raw_item in raw_items]
         if pkeys is not None:
             return items
         if len(items) > 0:
@@ -340,7 +340,7 @@ class Engine(object):
         for tablename, items in tables.iteritems():
             if atomic:
                 for item in items:
-                    expected = item.construct_ddb_expects()
+                    expected = item.construct_ddb_expects_()
                     count += 1
                     self.dynamo.delete_item(tablename, item.pk_dict_,
                                             expected=expected)
@@ -396,9 +396,9 @@ class Engine(object):
             if overwrite:
                 with table.batch_write() as batch:
                     for item in items:
-                        item.pre_save(self)
-                        batch.put_item(data=item.ddb_dump())
-                        item.post_save()
+                        item.pre_save_(self)
+                        batch.put_item(data=item.ddb_dump_())
+                        item.post_save_()
             else:
                 for item in items:
                     expected = {}
@@ -406,11 +406,11 @@ class Engine(object):
                         expected[name] = {
                             'Exists': False,
                         }
-                    item.pre_save(self)
-                    boto_item = Item(table, data=item.ddb_dump())
+                    item.pre_save_(self)
+                    boto_item = Item(table, data=item.ddb_dump_())
                     self.dynamo.put_item(tablename, boto_item.prepare_full(),
                                          expected=expected)
-                    item.post_save()
+                    item.post_save_()
 
     def refresh(self, items, consistent=False):
         """
@@ -438,9 +438,9 @@ class Engine(object):
             keys = [item.pk_dict_ for item in items]
             results = table.batch_get(keys, consistent=consistent)
             for item, data in itertools.izip(items, results):
-                with item.loading(self):
+                with item.loading_(self):
                     for key, val in data.items():
-                        item.set_ddb_val(key, val)
+                        item.set_ddb_val_(key, val)
 
     def sync(self, items, atomic=None, consistent=False):
         """
@@ -477,7 +477,7 @@ class Engine(object):
             for name in item.keys_():
                 field = item.meta_.fields.get(name)
                 if field is None:
-                    value = item.get(name)
+                    value = item.get_(name)
                     if Field.is_overflow_mutable(value):
                         if value != item.cached_(name):
                             item.__dirty__.add(name)
@@ -492,7 +492,7 @@ class Engine(object):
                 refresh_models.append(item)
                 continue
             fields = item.__dirty__
-            item.pre_save(self)
+            item.pre_save_(self)
 
             # If the model has changed any field that is part of a composite
             # field, FORCE the sync to be atomic. This prevents the composite
@@ -505,7 +505,7 @@ class Engine(object):
                         break
 
             if _atomic:
-                expected = item.construct_ddb_expects()
+                expected = item.construct_ddb_expects_()
             else:
                 expected = None
 
@@ -522,7 +522,7 @@ class Engine(object):
                 data[name] = {'Action': action}
                 if action != 'DELETE':
                     data[name]['Value'] = DYNAMIZER.encode(
-                        item.ddb_dump_field(name))
+                        item.ddb_dump_field_(name))
 
             # Atomic increment fields
             for name, value in item.__incrs__.iteritems():
@@ -552,11 +552,11 @@ class Engine(object):
             data = dict([(k, DYNAMIZER.decode(v)) for k, v in
                         ret.get('Attributes', {}).iteritems()])
             ret = Item(table, data=data)
-            with item.loading(self):
+            with item.loading_(self):
                 for key, val in dict(ret).iteritems():
-                    item.set_ddb_val(key, val)
+                    item.set_ddb_val_(key, val)
 
-            item.post_save()
+            item.post_save_()
 
         # Handle items that didn't have any fields to update
 

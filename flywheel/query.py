@@ -55,7 +55,7 @@ class Query(object):
             if attributes is not None:
                 yield result
             else:
-                yield self.model.ddb_load(self.engine, result)
+                yield self.model.ddb_load_(self.engine, result)
 
     def all(self, desc=False, consistent=False, attributes=None):
         """
@@ -210,7 +210,7 @@ class Scan(Query):
             if attributes is not None:
                 yield result
             else:
-                yield self.model.ddb_load(self.engine, result)
+                yield self.model.ddb_load_(self.engine, result)
 
     def index(self, name):
         raise TypeError("Scan cannot use an index!")

@@ -9,3 +9,4 @@ Models
     models/data_types
     models/schema
     models/composite_fields
+    models/metadata

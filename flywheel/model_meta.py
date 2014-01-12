@@ -18,7 +18,13 @@ class ValidationError(Exception):
 
 class Ordering(object):
 
-    """ A way that the models are ordered """
+    """
+    A way that the models are ordered
+
+    This will be a combination of a hash key and a range key. It may be the
+    primary key, a local secondary index, or a global secondary index.
+
+    """
 
     def __init__(self, meta, hash_key, range_key=None, index_name=None):
         self.meta = meta
@@ -26,12 +32,12 @@ class Ordering(object):
         self.range_key = range_key
         self.index_name = index_name
 
-    def score(self, obj=None):
-        """ Get the 'score' value for an object """
+    def score(self, obj):
+        """ Get the range key value for an object """
         return self.range_key.resolve(obj)
 
     def query_kwargs(self, **kwargs):
-        """ Get the boto query kwargs for querying against a field """
+        """ Get the boto query kwargs for querying against this index """
         kwargs = {'%s__eq' % self.hash_key.name:
                   self.hash_key.resolve(scope=kwargs)}
         if self.index_name is not None:
@@ -49,11 +55,18 @@ class Ordering(object):
 
 
 def merge_metadata(cls):
-    """ Merge all the __metadata__ dicts in a class's hierarchy """
-    cls_meta = getattr(cls, '__metadata__', {})
+    """
+    Merge all the __metadata__ dicts in a class's hierarchy
+
+    keys that do not begin with '_' will be inherited.
+
+    keys that begin with '_' will only apply to the object that defines them.
+
+    """
+    cls_meta = cls.__dict__.get('__metadata__', {})
     meta = {}
     for base in cls.__bases__:
-        meta.update(merge_metadata(base))
+        meta.update(getattr(base, '__metadata__', {}))
     # Don't merge any keys that start with '_'
     for key in meta.keys():
         if key.startswith('_'):
@@ -64,7 +77,13 @@ def merge_metadata(cls):
 
 class ModelMetaclass(type):
 
-    """ Metaclass for Model objects """
+    """
+    Metaclass for Model objects
+
+    Merges model metadata, sets the ``meta_`` attribute, and performs
+    validation checks.
+
+    """
     def __new__(mcs, name, bases, dct):
         cls = super(ModelMetaclass, mcs).__new__(mcs, name, bases, dct)
 
@@ -93,11 +112,13 @@ class ModelMetadata(object):
     ----------
     model : :class:`.Model`
 
-    Attribute
-    ---------
+    Attributes
+    ----------
     name : str
         The unique name of the model. This is set by the '_name' field in
         __metadata__. Defaults to the name of the model class.
+    abstract : bool
+        If a model is abstract then it has no table in Dynamo
     namespace : list
         The namespace of this model. Set by the Engine.
     global_indexes : list
@@ -121,6 +142,7 @@ class ModelMetadata(object):
         self.global_indexes = []
         self.orderings = []
         self.throughput = {'read': 5, 'write': 5}
+        self._abstract = False
         self.__dict__.update(model.__metadata__)
         self.name = self._name
         self.fields = {}
@@ -280,17 +302,26 @@ class ModelMetadata(object):
         return key_dict
 
     @property
+    def abstract(self):
+        """ Getter for abstract """
+        return self._abstract
+
+    @property
     def ddb_tablename(self):
         """ The name of the DynamoDB table """
+        if self.abstract:
+            return None
         return '-'.join(self.namespace + [self.name])
 
     def ddb_table(self, connection):
         """ Construct a Dynamo table from a connection """
+        if self.abstract:
+            return None
         return Table(self.ddb_tablename, connection=connection)
 
     def validate_model(self):
         """ Perform validation checks on the model declaration """
-        if self.model.__dict__.get('__abstract__'):
+        if self.abstract or self.model.__dict__.get('__abstract__'):
             return
         hash_keys = [f for f in self.fields.values() if f.hash_key]
         range_keys = [f for f in self.fields.values() if f.range_key]
@@ -349,6 +380,8 @@ class ModelMetadata(object):
             Table name that was created, or None if nothing created
 
         """
+        if self.abstract:
+            return None
         if tablenames is None:
             tablenames = connection.list_tables()['TableNames']
         if self.ddb_tablename in tablenames:
@@ -435,6 +468,8 @@ class ModelMetadata(object):
             Table name that was deleted, or None if nothing deleted
 
         """
+        if self.abstract:
+            return None
         if tablenames is None:
             tablenames = connection.list_tables()['TableNames']
 
