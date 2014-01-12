@@ -101,7 +101,8 @@ class Model(object):
         save operation.
     __cache__ : dict
         The last seen value that was stored in the database. This is used to
-        construct the ``expects`` dict when making atomic updates.
+        construct the ``expects`` dict when making updates that raise on
+        conflict.
     __incrs__ : dict
         Mapping of fields to atomic add/delete operations for numbers and sets.
 
@@ -128,18 +129,18 @@ class Model(object):
 
         self.__engine__.refresh(self, consistent=consistent)
 
-    def sync(self, atomic=False):
+    def sync(self, raise_on_conflict=None):
         """ Sync model changes back to database """
         if self.__engine__ is None:
             raise ValueError("Cannot sync: No DB connection")
 
-        self.__engine__.sync(self, atomic=atomic)
+        self.__engine__.sync(self, raise_on_conflict=raise_on_conflict)
 
-    def delete(self, atomic=False):
+    def delete(self, raise_on_conflict=None):
         """ Delete the model from the database """
         if self.__engine__ is None:
             raise ValueError("Cannot delete: No DB connection")
-        self.__engine__.delete(self, atomic=atomic)
+        self.__engine__.delete(self, raise_on_conflict=raise_on_conflict)
 
     @classmethod
     def __on_create__(cls):
@@ -194,8 +195,11 @@ class Model(object):
                 super(Model, self).__setattr__(name, field.coerce(value))
         else:
             if (not self._loading and self.persisted_ and name not in
-                    self.__cache__ and Field.is_overflow_mutable(value)):
-                self.__cache__[name] = copy.copy(self.get_(name))
+                    self.__cache__):
+                if Field.is_overflow_mutable(value):
+                    self.__cache__[name] = copy.copy(self.get_(name))
+                else:
+                    self.__cache__[name] = self.get_(name)
             self._overflow[name] = value
 
     def __delattr__(self, name):
@@ -429,10 +433,12 @@ class Model(object):
                 obj.set_ddb_val_(key, val)
         return obj
 
-    def construct_ddb_expects_(self):
+    def construct_ddb_expects_(self, fields=None):
         """ Construct a dynamo "expects" mapping based on the cached fields """
         expected = {}
-        for name in self.keys_():
+        if fields is None:
+            fields = self.keys_()
+        for name in fields:
             cache_val = self.cached_(name)
             expect = {
                 'Exists': not Field.is_null(cache_val),

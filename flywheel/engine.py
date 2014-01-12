@@ -26,7 +26,7 @@ class Engine(object):
     dynamo : :class:`boto.dynamodb2.DynamoDBConnection`, optional
     namespace : list, optional
         List of namespace component strings for models
-    default_atomic : {True, False, 'update'}, optional
+    default_conflict : {'update', 'overwrite', 'raise'}, optional
         Default setting for delete(), save(), and sync() (default 'update')
 
     Notes
@@ -76,63 +76,63 @@ class Engine(object):
 
     """
 
-    def __init__(self, dynamo=None, namespace=None, default_atomic='update'):
+    def __init__(self, dynamo=None, namespace=None, default_conflict='update'):
         self.dynamo = dynamo
         self.models = {}
         self.namespace = namespace or []
         ModelMetadata.namespace = self.namespace
-        self._default_atomic = None
-        self.default_atomic = default_atomic
+        self.default_conflict = default_conflict
 
     @property
-    def default_atomic(self):
+    def default_conflict(self):
         """
-        Get the default_atomic value
+        Get the default_conflict value
 
         Notes
         -----
-        The default_atomic setting configures the behavior of save(), sync(), and
-        delete(). Below is an explanation of the different values of
-        default_atomic.
+        The ``default_conflict`` setting configures the default behavior of
+        :meth:`~.Engine.save`, :meth:`~.Engine.sync`, and
+        :meth:`~.Engine.delete`. Below is an explanation of the different
+        values of ``default_conflict``.
 
-        +----------------+--------+-----------------+
-        | default_atomic | method | default         |
-        +================+========+=================+
-        |**'update'**    |        |                 |
-        +----------------+--------+-----------------+
-        |                | save   | overwrite=True  |
-        +----------------+--------+-----------------+
-        |                | sync   | atomic=True     |
-        +----------------+--------+-----------------+
-        |                | delete | atomic=False    |
-        +----------------+--------+-----------------+
-        |**True**        |        |                 |
-        +----------------+--------+-----------------+
-        |                | save   | overwrite=False |
-        +----------------+--------+-----------------+
-        |                | sync   | atomic=True     |
-        +----------------+--------+-----------------+
-        |                | delete | atomic=True     |
-        +----------------+--------+-----------------+
-        |**False**       |        |                 |
-        +----------------+--------+-----------------+
-        |                | save   | overwrite=True  |
-        +----------------+--------+-----------------+
-        |                | sync   | atomic=False    |
-        +----------------+--------+-----------------+
-        |                | delete | atomic=False    |
-        +----------------+--------+-----------------+
+        +------------------+--------+-------------------------+
+        | default_conflict | method | default                 |
+        +==================+========+=========================+
+        |**'update'**      |        |                         |
+        +------------------+--------+-------------------------+
+        |                  | save   | overwrite=True          |
+        +------------------+--------+-------------------------+
+        |                  | sync   | raise_on_conflict=True  |
+        +------------------+--------+-------------------------+
+        |                  | delete | raise_on_conflict=False |
+        +------------------+--------+-------------------------+
+        |**'overwrite'**   |        |                         |
+        +------------------+--------+-------------------------+
+        |                  | save   | overwrite=True          |
+        +------------------+--------+-------------------------+
+        |                  | sync   | raise_on_conflict=False |
+        +------------------+--------+-------------------------+
+        |                  | delete | raise_on_conflict=False |
+        +------------------+--------+-------------------------+
+        |**'raise'**       |        |                         |
+        +------------------+--------+-------------------------+
+        |                  | save   | overwrite=False         |
+        +------------------+--------+-------------------------+
+        |                  | sync   | raise_on_conflict=True  |
+        +------------------+--------+-------------------------+
+        |                  | delete | raise_on_conflict=True  |
+        +------------------+--------+-------------------------+
 
         """
-        return self._default_atomic
+        return self._default_conflict
 
-    @default_atomic.setter
-    def default_atomic(self, default_atomic):
-        """ Protected setter for default_atomic """
-        if default_atomic not in (True, False, 'update'):
-            raise ValueError("Unrecognized value '%s' for default_atomic" %
-                             default_atomic)
-        self._default_atomic = default_atomic
+    @default_conflict.setter
+    def default_conflict(self, default_conflict):
+        """ Protected setter for default_conflict """
+        if default_conflict not in ('update', 'overwrite', 'raise'):
+            raise ValueError("Unrecognized value '%s' for default_conflict" %
+                             default_conflict)
+        self._default_conflict = default_conflict
 
     def connect_to_region(self, region, **kwargs):
         """ Connect to an AWS region """
@@ -303,7 +303,7 @@ class Engine(object):
     # Alias because it makes sense
     delete_keys = delete_key
 
-    def delete(self, items, atomic=None):
+    def delete(self, items, raise_on_conflict=None):
         """
         Delete items from dynamo
 
@@ -311,9 +311,9 @@ class Engine(object):
         ----------
         items : list or :class:`~flywheel.model.Model`
             List of :class:`~flywheel.models.Model` objects to delete
-        atomic : bool, optional
-            If True, raise exception if the object has changed out from under
-            us (default set by :attr:`.default_atomic`)
+        raise_on_conflict : bool, optional
+            If True, raise exception if the object was changed concurrently in
+            the database (default set by :attr:`.default_conflict`)
 
         Raises
         ------
@@ -322,12 +322,13 @@ class Engine(object):
 
         Notes
         -----
-        Due to the structure of the AWS API, deleting with atomic=False is much
-        faster because the requests can be batched.
+        Due to the structure of the AWS API, deleting with
+        raise_on_conflict=False is much faster because the requests can be
+        batched.
 
         """
-        if atomic is None:
-            atomic = self.default_atomic is True
+        if raise_on_conflict is None:
+            raise_on_conflict = self.default_conflict == 'raise'
         if isinstance(items, Model):
             items = [items]
         if not items:
@@ -338,7 +339,7 @@ class Engine(object):
 
         count = 0
         for tablename, items in tables.iteritems():
-            if atomic:
+            if raise_on_conflict:
                 for item in items:
                     expected = item.construct_ddb_expects_()
                     count += 1
@@ -365,7 +366,7 @@ class Engine(object):
         items : list or :class:`~flywheel.models.Model`
         overwrite : bool, optional
             If False, raise exception if item already exists (default set by
-            :attr:`.default_atomic`)
+            :attr:`.default_conflict`)
 
         Raises
         ------
@@ -383,7 +384,7 @@ class Engine(object):
 
         """
         if overwrite is None:
-            overwrite = self.default_atomic is not True
+            overwrite = self.default_conflict in ('update', 'overwrite')
         if isinstance(items, Model):
             items = [items]
         if not items:
@@ -442,7 +443,7 @@ class Engine(object):
                     for key, val in data.items():
                         item.set_ddb_val_(key, val)
 
-    def sync(self, items, atomic=None, consistent=False):
+    def sync(self, items, raise_on_conflict=None, consistent=False):
         """
         Sync model changes back to database
 
@@ -453,9 +454,10 @@ class Engine(object):
         ----------
         items : list or :class:`~flywheel.models.Model`
             Models to sync
-        atomic : bool, optional
-            If True, raise exception if the object has changed out from under
-            us (default set by :attr:`.default_atomic`)
+        raise_on_conflict : bool, optional
+            If True, raise exception if any of the fields that are being
+            updated were concurrently changed in the database (default set by
+            :attr:`.default_conflict`)
         consistent : bool, optional
             If True, force a consistent read from the db. This will only take
             effect if the sync is only performing a read. (default False)
@@ -463,16 +465,15 @@ class Engine(object):
         Raises
         ------
         exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
-            If atomic=True and the model changed underneath us
+            If raise_on_conflict=True and the model changed underneath us
 
         """
-        if atomic is None:
-            atomic = self.default_atomic is not False
+        if raise_on_conflict is None:
+            raise_on_conflict = self.default_conflict in ('update', 'raise')
         if isinstance(items, Model):
             items = [items]
         refresh_models = []
         for item in items:
-            _atomic = atomic
             # Look for any mutable fields (e.g. sets) that have changed
             for name in item.keys_():
                 field = item.meta_.fields.get(name)
@@ -481,10 +482,9 @@ class Engine(object):
                     if Field.is_overflow_mutable(value):
                         if value != item.cached_(name):
                             item.__dirty__.add(name)
-                elif field.is_mutable and name not in item.__dirty__:
+                elif (field.is_mutable and name not in item.__dirty__ and
+                        name not in item.__incrs__):
                     cached_var = item.cached_(name)
-                    if cached_var is None:
-                        cached_var = field.default
                     if field.resolve(item) != cached_var:
                         item.__dirty__.add(name)
 
@@ -495,17 +495,18 @@ class Engine(object):
             item.pre_save_(self)
 
             # If the model has changed any field that is part of a composite
-            # field, FORCE the sync to be atomic. This prevents the composite
-            # key from potentially getting into an inconsistent state
+            # field, FORCE the sync to raise on conflict. This prevents the
+            # composite key from potentially getting into an inconsistent state
+            _raise_on_conflict = raise_on_conflict
             for name in itertools.chain(item.__incrs__, fields):
                 for related_name in item.meta_.related_fields.get(name, []):
                     field = item.meta_.fields[related_name]
                     if field.composite:
-                        _atomic = True
+                        __raise_on_conflict = True
                         break
 
-            if _atomic:
-                expected = item.construct_ddb_expects_()
+            if _raise_on_conflict:
+                expected = item.construct_ddb_expects_(fields)
             else:
                 expected = None
 

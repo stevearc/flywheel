@@ -64,8 +64,8 @@ You can also fetch many at a time:
 
 Delete
 ------
-Deletes an item. You may pass in ``delete(atomic=True)``, which will only
-delete the item if none of the values have changed since it was read.
+Deletes an item. You may pass in ``delete(raise_on_conflict=True)``, which will
+only delete the item if none of the values have changed since it was read.
 
 .. code-block:: python
 
@@ -129,17 +129,18 @@ there are no conflicting fields. Note that this behavior is distinctly
 different from ``save()``, so make sure you pick the right call for your use
 case.
 
-Atomic Sync
-^^^^^^^^^^^
-If you use ``sync(atomic=True)``, the sync operation will check that every
-field that you're updating has not been changed since you last read it. This is
-very useful for preventing concurrent writes.
+Safe Sync
+^^^^^^^^^
+If you use ``sync(raise_on_conflict=True)``, the sync operation will check that
+the fields that you're updating have not been changed since you last read them.
+This is very useful for preventing concurrent writes.
 
 .. note::
 
     If you change a key that is part of a :ref:`composite
-    field<composite_fields>`, flywheel will **force** the sync to be atomic.
-    This avoids the risk of corrupting the value of the composite field.
+    field<composite_fields>`, flywheel will **force** the sync to raise on
+    conflict.  This avoids the risk of corrupting the value of the composite
+    field.
 
 Atomic Increment
 ^^^^^^^^^^^^^^^^
@@ -158,7 +159,7 @@ BOOM.
 .. note::
 
     Incrementing a field that is part of a composite field will also force the
-    sync to be atomic.
+    sync to raise on conflict.
 
 Atomic Add/Remove
 ^^^^^^^^^^^^^^^^^
@@ -181,11 +182,11 @@ And to delete:
 Note than you can pass in a single value or a set of values to both ``add_``
 and ``remove_``.
 
-Default Atomic Behavior
------------------------
+Default Conflict Behavior
+-------------------------
 You can configure the default behavior for each of these endpoints using
-:attr:`~flywheel.engine.Engine.default_atomic`. The default setting will cause
-``sync()`` to be atomic, ``delete()`` not to be, and ``save()`` will overwrite.
-Check the attribute docs for more options. You can, of course, pass in the
-argument to the calls directly to override this behavior on a case-by-case
-basis.
+:attr:`~flywheel.engine.Engine.default_conflict`. The default setting will
+cause ``sync()`` to check for conflicts, ``delete()`` not to check for
+conflicts, and ``save()`` to overwrite existing values.  Check the attribute
+docs for more options. You can, of course, pass in the argument to the calls
+directly to override this behavior on a case-by-case basis.

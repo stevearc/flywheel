@@ -5,6 +5,7 @@ except ImportError:  # pragma: no cover
     __version__ = 'unknown'
 
 import boto.dynamodb.types
+from boto.dynamodb2.exceptions import ConditionalCheckFailedException
 from boto.dynamodb.types import Binary
 from boto.dynamodb2.types import (STRING, NUMBER, BINARY, STRING_SET,
                                   NUMBER_SET, BINARY_SET)

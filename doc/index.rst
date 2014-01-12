@@ -32,7 +32,6 @@ Indices and tables
 
 TODO
 ====
-* rename the 'atomic' parameter to something clearer
 * release to pypi
 * Cross-table linking (One and Many)
 * Sets of custom data types (e.g. dates)

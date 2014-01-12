@@ -1,12 +1,11 @@
 """ Tests for models """
-from flywheel.engine import Engine
-from mock import patch, ANY
 import json
-from boto.dynamodb2.exceptions import ConditionalCheckFailedException
 from decimal import Decimal
+from mock import patch, ANY
 
 from . import BaseSystemTest
-from flywheel import Field, Composite, Model, NUMBER, GlobalIndex
+from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
+                      ConditionalCheckFailedException)
 
 
 class Widget(Model):
@@ -210,14 +209,14 @@ class TestModelMutation(BaseSystemTest):
     def test_sync_new(self):
         """ Sync on a new item will create the item """
         p = Post('a', 'b', 4)
-        self.engine.sync(p, atomic=False)
+        self.engine.sync(p, raise_on_conflict=False)
         p2 = self.engine.scan(Post).first()
         self.assertEquals(p, p2)
 
-    def test_atomic_sync_new(self):
-        """ Atomic sync on a new item will create the item """
+    def test_conflict_sync_new(self):
+        """ sync on a new item with raise_on_conflict=True creates item """
         p = Post('a', 'b', 4)
-        self.engine.sync(p, atomic=True)
+        self.engine.sync(p, raise_on_conflict=True)
         p2 = self.engine.scan(Post).first()
         self.assertEquals(p, p2)
 
@@ -225,11 +224,11 @@ class TestModelMutation(BaseSystemTest):
         """ Syncing two new items with same pkey merges other fields """
         a = Article('a')
         a.author = 'me'
-        self.engine.sync(a, atomic=False)
+        self.engine.sync(a, raise_on_conflict=False)
 
         a2 = Article('a')
         a2.comments = 3
-        self.engine.sync(a2, atomic=False)
+        self.engine.sync(a2, raise_on_conflict=False)
 
         self.assertEquals(a2.author, 'me')
         self.assertEquals(a2.comments, 3)
@@ -241,7 +240,7 @@ class TestModelMutation(BaseSystemTest):
             self.engine.save(p)
             p.foobar = set('a')
             p.points = Decimal('2')
-            p.sync()
+            p.sync(raise_on_conflict=False)
             data = {
                 'foobar': ANY,
                 'points': ANY,
@@ -258,23 +257,23 @@ class TestModelMutation(BaseSystemTest):
         results = self.engine.scan(Post).all()
         self.assertEquals(results, [])
 
-    def test_atomic_delete(self):
-        """ Atomic delete should delete item if no conflicts """
+    def test_delete_no_conflict(self):
+        """ Delete should delete item if no conflicts """
         p = Post('a', 'b', 4)
         self.engine.save(p)
-        p.delete(atomic=True)
+        p.delete(raise_on_conflict=True)
         results = self.engine.scan(Post).all()
         self.assertEquals(results, [])
 
-    def test_atomic_delete_conflict(self):
-        """ Atomic delete should raise exception on conflict """
+    def test_delete_conflict(self):
+        """ Delete raise_on_conflict=True should raise exception on conflict """
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
         p.ts = 10
         p.sync()
         with self.assertRaises(ConditionalCheckFailedException):
-            p2.delete(atomic=True)
+            p2.delete(raise_on_conflict=True)
 
     def test_refresh(self):
         """ Refreshing model should refresh data """
@@ -298,17 +297,17 @@ class TestModelMutation(BaseSystemTest):
             'title': a.title,
         })
 
-    def test_atomic_sync(self):
-        """ Atomic sync used normally just syncs object """
+    def test_sync_no_conflict(self):
+        """ Sync raise_on_conflict=True used just syncs object """
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p.text = "hey"
-        p.sync(atomic=True)
+        p.sync(raise_on_conflict=True)
         p2 = self.engine.scan(Post).first()
         self.assertEquals(p2.text, p.text)
 
-    def test_atomic_sync_error(self):
-        """ When doing an atomic sync, parallel writes raise error """
+    def test_sync_conflict(self):
+        """ With sync raise_on_conflict=True, parallel writes raise error """
         p = Post('a', 'b', 4)
         p.foobar = "foo"
         self.engine.save(p)
@@ -317,10 +316,10 @@ class TestModelMutation(BaseSystemTest):
         p.sync()
         p2.foobar = "hi"
         with self.assertRaises(ConditionalCheckFailedException):
-            p2.sync(atomic=True)
+            p2.sync(raise_on_conflict=True)
 
-    def test_atomic_sync_error_exist(self):
-        """ When doing an atomic sync, double-create raises error """
+    def test_sync_exist_conflict(self):
+        """ When syncing, double-create raises error """
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
@@ -328,10 +327,10 @@ class TestModelMutation(BaseSystemTest):
         p.sync()
         p2.foobar = "hi"
         with self.assertRaises(ConditionalCheckFailedException):
-            p2.sync(atomic=True)
+            p2.sync(raise_on_conflict=True)
 
-    def test_atomic_sync_composite_conflict(self):
-        """ Atomic sync where composite key conflicts raises error """
+    def test_sync_composite_conflict(self):
+        """ Sync where composite key conflicts raises error """
         p = Post('a', 'b', 0, 'me', 'hi')
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
@@ -339,7 +338,7 @@ class TestModelMutation(BaseSystemTest):
         p.sync()
         p2.text = "hey"
         with self.assertRaises(ConditionalCheckFailedException):
-            p2.sync(atomic=True)
+            p2.sync(raise_on_conflict=True)
 
     def test_sync_update(self):
         """ Sync should pull down most recent model """
@@ -382,7 +381,7 @@ class TestModelMutation(BaseSystemTest):
         p.incr_(foobar=5)
         p.sync()
         p2.incr_(foobar=3)
-        p2.sync(atomic=False)
+        p2.sync(raise_on_conflict=False)
         self.assertEquals(p2.foobar, 8)
 
     def test_incr_float(self):
@@ -405,16 +404,16 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(p.points, Decimal('3.5'))
         self.assertTrue(isinstance(p.points, Decimal))
 
-    def test_incr_atomic(self):
-        """ Parallel increments with atomic=True raises exception """
+    def test_incr_no_conflict(self):
+        """ Parallel increments with raise_on_conflict=True works """
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
         p.incr_(foobar=5)
         p.sync()
         p2.incr_(foobar=3)
-        with self.assertRaises(ConditionalCheckFailedException):
-            p2.sync(atomic=True)
+        p2.sync(raise_on_conflict=True)
+        self.assertEqual(p2.foobar, 8)
 
     def test_double_incr(self):
         """ Incrementing a field twice should work fine """
@@ -451,7 +450,7 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(p.ts, 10)
         self.assertEquals(p.foobar, 3)
 
-    def test_incr_composite(self):
+    def test_incr_composite_piece(self):
         """ Incrementing a field will change any dependent composite fields """
         p = Post('a', 'b', 0)
         self.engine.save(p)
@@ -464,12 +463,12 @@ class TestModelMutation(BaseSystemTest):
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
 
-    def test_incr_composite_atomic(self):
-        """ Incr a field and atomic sync changes any dependent fields """
+    def test_incr_composite(self):
+        """ Incr a field and sync changes any dependent fields """
         p = Post('a', 'b', 0)
         self.engine.save(p)
         p.incr_(likes=4)
-        p.sync(atomic=True)
+        p.sync(raise_on_conflict=True)
 
         table = p.meta_.ddb_table(self.dynamo)
         result = dict(list(table.scan())[0])
@@ -510,7 +509,7 @@ class TestModelMutation(BaseSystemTest):
         result = dict(list(table.scan())[0])
         self.assertFalse('foobar' in result)
 
-    def test_atomic_add_to_set(self):
+    def test_add_to_set(self):
         """ Adding a value to a set should be atomic """
         p = Post('a', 'b', 0)
         self.engine.save(p)
@@ -521,19 +520,19 @@ class TestModelMutation(BaseSystemTest):
         p2.sync()
         self.assertEqual(p2.tags, set(['a', 'b', 'c']))
 
-    def test_atomic_add_to_set_conflict(self):
-        """ Atomically adding value to a set can raise error on conflic """
+    def test_add_to_set_conflict(self):
+        """ Concurrent add to set with raise_on_conflict=True works """
         p = Post('a', 'b', 0)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
         p.add_(tags='a')
         p2.add_(tags=set(['b', 'c']))
         p.sync()
-        with self.assertRaises(ConditionalCheckFailedException):
-            p2.sync(atomic=True)
+        p2.sync(raise_on_conflict=True)
+        self.assertEqual(p2.tags, set(['a', 'b', 'c']))
 
-    def test_atomic_add_to_set_presync(self):
-        """ Atomically adding to a set should update local model value """
+    def test_add_to_set_presync(self):
+        """ Adding to a set should update local model value """
         p = Post('a', 'b', 0)
         p.add_(tags='a')
         self.assertEqual(p.tags, set(['a']))
@@ -556,15 +555,15 @@ class TestModelMutation(BaseSystemTest):
         with self.assertRaises(TypeError):
             p.add_(keywords=4)
 
-    def test_atomic_remove_from_set_presync(self):
-        """ Atomically removing from a set should update local model value """
+    def test_remove_from_set_presync(self):
+        """ Removing from a set should update local model value """
         p = Post('a', 'b', 0)
         p.tags = set(['a', 'b', 'c'])
         self.engine.save(p)
         p.remove_(tags=set(['a', 'b']))
         self.assertEqual(p.tags, set(['c']))
 
-    def test_atomic_remove_from_set(self):
+    def test_remove_from_set(self):
         """ Removing values from a set should be atomic """
         p = Post('a', 'b', 0)
         p.tags = set(['a', 'b', 'c', 'd'])
@@ -576,21 +575,21 @@ class TestModelMutation(BaseSystemTest):
         p2.sync()
         self.assertEqual(p2.tags, set(['d']))
 
-    def test_atomic_set_keyerror(self):
-        """ Cannot atomically remove missing elements from set """
+    def test_remove_set_keyerror(self):
+        """ Cannot remove missing elements from set """
         p = Post('a', 'b', 0)
         with self.assertRaises(KeyError):
             p.remove_(tags='a')
 
-    def test_atomic_set_one_op(self):
+    def test_mutate_set_one_op(self):
         """ Can only atomically add or remove in a single update """
         p = Post('a', 'b', 0)
         p.add_(tags='a')
         with self.assertRaises(ValueError):
             p.remove_(tags='b')
 
-    def test_atomic_set_smart_one_op(self):
-        """ If atomic adds/removes cancel out, throw no error """
+    def test_mutate_set_smart_one_op(self):
+        """ If adds/removes cancel out, throw no error """
         p = Post('a', 'b', 0)
         p.add_(tags='a')
         p.remove_(tags='a')
