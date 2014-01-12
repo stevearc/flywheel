@@ -6,4 +6,5 @@ nose
 sphinx
 numpydoc
 mock
+httpretty
 moto
