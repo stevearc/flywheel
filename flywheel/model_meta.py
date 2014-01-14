@@ -32,10 +32,6 @@ class Ordering(object):
         self.range_key = range_key
         self.index_name = index_name
 
-    def score(self, obj):
-        """ Get the range key value for an object """
-        return self.range_key.resolve(obj)
-
     def query_kwargs(self, **kwargs):
         """ Get the boto query kwargs for querying against this index """
         kwargs = {'%s__eq' % self.hash_key.name:
