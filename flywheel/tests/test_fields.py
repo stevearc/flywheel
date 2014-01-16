@@ -1,15 +1,16 @@
 """ Tests for fields """
+import zlib
 from datetime import datetime, date
 
 import json
-import zlib
 from decimal import Decimal
+from flywheel.fields.types import DictType, S3Type, Key, register_type
+from moto import mock_s3
 
+import boto
 from . import BaseSystemTest
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex)
-from flywheel.fields.types import DictType, S3Type, Key, register_type
-from moto import mock_s3
 
 
 try:
@@ -260,9 +261,19 @@ class TestFieldCoerce(unittest.TestCase):
 
     @mock_s3
     def test_coerce_s3key(self):
-        """ Coerce to S3 key """
-        field = Field(data_type=S3Type('mybucket'), coerce=True)
+        """ Coerce string to S3 key """
+        field = Field(data_type=S3Type('mybucket'))
         ret = field.coerce('my/path')
+        self.assertTrue(isinstance(ret, Key))
+        self.assertEqual(ret.key, 'my/path')
+
+    @mock_s3
+    def test_coerce_boto_s3key(self):
+        """ Coerce boto key to S3 key """
+        field = Field(data_type=S3Type('mybucket'))
+        boto_key = boto.s3.key.Key()
+        boto_key.key = 'my/path'
+        ret = field.coerce(boto_key)
         self.assertTrue(isinstance(ret, Key))
         self.assertEqual(ret.key, 'my/path')
 
@@ -479,7 +490,6 @@ class TestFields(BaseSystemTest):
     @mock_s3
     def test_s3_data(self):
         """ Can save and retrieve S3 data """
-        import boto
         conn = boto.connect_s3()
         conn.create_bucket('mybucket')
         w = Widget(string='a', string2='b')

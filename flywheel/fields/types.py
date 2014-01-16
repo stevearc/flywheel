@@ -405,6 +405,17 @@ class Key(boto.s3.key.Key):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def copy_data_from_key(self, key):
+        """ Copy the data from a boto Key """
+        for attr in ('name', 'metadata', 'cache_control', 'content_type',
+                     'content_encoding', 'content_disposition',
+                     'content_language', 'filename', 'etag', 'is_latest',
+                     'last_modified', 'owner', 'storage_class', 'path', 'resp',
+                     'mode', 'size', 'version_id', 'source_version_id',
+                     'delete_marker', 'encrypted', 'ongoing_restore',
+                     'expiry_date', 'local_hashes'):
+            setattr(self, attr, getattr(key, attr))
+
 
 class S3Type(TypeDefinition):
 
@@ -475,7 +486,13 @@ class S3Type(TypeDefinition):
     def coerce(self, value, force):
         """ S3Type will auto-coerce string types """
         if not isinstance(value, Key):
-            if force or isinstance(value, basestring):
+            # silently convert boto Keys to our subclass
+            if isinstance(value, boto.s3.key.Key):
+                key = Key(self.bucket)
+                key.copy_data_from_key(value)
+                return key
+            # Silently convert strings
+            if isinstance(value, basestring):
                 key = Key(self.bucket)
                 key.key = value
                 return key
