@@ -63,5 +63,6 @@ Indices and tables
 
 TODO
 ====
+* Avoid the superfluous calls to describe_table in Table constructor
 * Cross-table linking (One and Many)
 * Fields should be able to set nullable=False
