@@ -129,6 +129,9 @@ there are no conflicting fields. Note that this behavior is distinctly
 different from ``save()``, so make sure you pick the right call for your use
 case.
 
+If you call ``sync()`` on an object that has not been changed, it is equivalent
+to calling ``refresh()``.
+
 Safe Sync
 ^^^^^^^^^
 If you use ``sync(raise_on_conflict=True)``, the sync operation will check that

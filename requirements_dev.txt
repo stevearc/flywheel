@@ -1,10 +1,11 @@
-pylint
+pylint==1.1.0
 pep8
 autopep8
 tox
 nose
 sphinx
 numpydoc
+sphinx_rtd_theme
 mock
 httpretty
 moto

@@ -56,7 +56,7 @@ automatically change. Which will re-arrange it in the index that you created.
 Then, if you mark the post as "deleted", it will remove the score field which
 removes it from the index.
 
-Whooooaaahh...
+*Whooooaaahh...*
 
 The last neat little thing about Composite fields is how you can query them.
 For numeric Composite fields you probably want to query directly on the score

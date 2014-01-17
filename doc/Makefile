@@ -47,7 +47,6 @@ clean:
 
 apidoc:
 	$(SPHINXAPIDOC) -f -e -o $(APIDIR) ../flywheel
-	rm -f $(APIDIR)/*.tests.*
 	@echo
 	@echo "Build finished. The RST files are in $(APIDIR)."
 

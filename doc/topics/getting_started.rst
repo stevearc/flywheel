@@ -7,13 +7,11 @@ package.  The easiest way to do this is using `devbox
     wget https://raw.github.com/mathcamp/devbox/master/devbox/unbox.py && \
     python unbox.py git@github.com:mathcamp/flywheel
 
-Then do
+This will clone the repo and install it into a virtualenv named flywheel_env. You can now install flywheel into any virtualenv with:
 
 .. code-block:: bash
 
-    $ cd flywheel
-    $ . flywheel_env/bin/activate
-    $ flywheel
+    pip install path/to/flywheel
 
 Here are the very first steps you need to take to get started with flywheel:
 

@@ -383,7 +383,7 @@ class Field(object):
         return Condition.construct(self.name, 'between', (low, high))
 
     def betwixt_(self, low, high):
-        """ Poetic version of between_ """
+        """ Poetic version of :meth:`~.between_` """
         return self.between_(low, high)
 
 

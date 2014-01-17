@@ -67,15 +67,14 @@ you.
 .. note::
 
     Certain fields will auto-coerce specific data types. For example, a ``str``
-    field will auto-encode a ``unicode`` value using ``utf-8`` even if
-    ``coerce=False``. Similarly, a ``unicode`` field will auto-decode a ``str``
-    value using ``utf-8``.
+    field will auto-encode a ``unicode`` to utf-8 even if ``coerce=False``.
+    Similarly, a ``unicode`` field will auto-decode a ``str`` value to a
+    unicode string.
 
 .. warning::
 
     If an ``int`` field is set to coerce values, it will still refuse to drop
-    floating point data. Your application should never discard data without
-    being explicitly told to. This has the following effect:
+    floating point data. This has the following effect:
 
 .. code-block:: python
 

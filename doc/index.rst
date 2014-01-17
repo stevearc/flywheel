@@ -32,6 +32,7 @@ Indices and tables
 
 TODO
 ====
+* query objects should be iterable
 * release to pypi
 * Cross-table linking (One and Many)
 * Fields should be able to set nullable=False

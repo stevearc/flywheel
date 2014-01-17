@@ -17,6 +17,13 @@ REQUIREMENTS = [
 if sys.version_info[:2] < (2, 7):
     REQUIREMENTS.extend(['unittest2'])
 
+TEST_REQUIREMENTS = [
+    'nose',
+    'mock',
+    'httpretty',
+    'moto',
+]
+
 if __name__ == "__main__":
     setup(
         name='flywheel',
@@ -44,5 +51,5 @@ if __name__ == "__main__":
             ],
         },
         install_requires=REQUIREMENTS,
-        tests_require=REQUIREMENTS,
+        tests_require=REQUIREMENTS + TEST_REQUIREMENTS,
     )
