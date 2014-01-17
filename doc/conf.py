@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
+""" Sphinx conf """
 import sys
 import os
 import sphinx_rtd_theme
+
+# pylint: disable=C0103
 docs_basepath = os.path.abspath(os.path.dirname(__file__))
 
 addtl_paths = (
     os.pardir,
 )
-from flywheel_version import git_version_data
-
 for path in addtl_paths:
     sys.path.insert(0, os.path.abspath(os.path.join(docs_basepath, path)))
+
+from flywheel_version import git_version_data
 
 extensions = ['sphinx.ext.autodoc', 'numpydoc', 'sphinx.ext.intersphinx',
               'sphinx.ext.linkcode', 'sphinx.ext.autosummary']
@@ -35,6 +38,7 @@ intersphinx_mapping = {
 
 
 def linkcode_resolve(domain, info):
+    """ Create source links to github """
     if domain != 'py' or not info['module']:
         return None
     filename = info['module'].replace('.', '/')
