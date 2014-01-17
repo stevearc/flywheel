@@ -27,6 +27,6 @@ def float_to_decimal(f):  # pragma: no cover
 boto.dynamodb.types.float_to_decimal = float_to_decimal
 
 
-from .fields import Field, Composite, GlobalIndex, TypeDefinition
+from .fields import Field, Composite, GlobalIndex, TypeDefinition, set_
 from .models import Model
 from .engine import Engine

@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from .conditions import Condition
 from .indexes import GlobalIndex
-from .types import TypeDefinition, ALL_TYPES
+from .types import TypeDefinition, ALL_TYPES, set_
 
 NO_ARG = object()
 
@@ -166,8 +166,10 @@ class Field(object):
             force_coerce = self._coerce
         try:
             return self.data_type.coerce(value, force_coerce)
-        except (TypeError, ValueError):
-            raise TypeError("Field '%s' must be %s! ('%s')" %
+        except (TypeError, ValueError) as e:
+            if e.args:
+                raise
+            raise TypeError("Field '%s' must be %s! '%s'" %
                             (self.name, self.data_type, repr(value)))
 
     @property
@@ -324,7 +326,8 @@ class Field(object):
         if not self.overflow and filter not in self.data_type.allowed_filters:
             raise TypeError("Cannot use '%s' filter on '%s' field" %
                             (filter, self.data_type))
-        return Condition.construct(self.name, filter, other)
+        return Condition.construct(self.name, filter,
+                                   self.data_type.ddb_dump_inner(other))
 
     def contains_(self, other):
         """ Create a query condition that this field must contain a value """

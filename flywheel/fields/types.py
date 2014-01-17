@@ -1,4 +1,5 @@
 """ Field type definitions """
+import functools
 import datetime
 
 import json
@@ -12,11 +13,20 @@ from decimal import Decimal
 ALL_TYPES = {}
 
 
-def register_type(type_class):
+def set_(data_type):
+    """ Create an alias for a SetType that contains this data type """
+    return frozenset([data_type])
+
+
+def register_type(type_class, allow_in_set=True):
     """ Register a type class for use with Fields """
     ALL_TYPES[type_class.data_type] = type_class
+    if allow_in_set:
+        set_key = set_(type_class.data_type)
+        ALL_TYPES[set_key] = SetType.bind(type_class.data_type)
     for alias in type_class.aliases:
         ALL_TYPES[alias] = type_class
+        ALL_TYPES[set_(alias)] = SetType.bind(alias)
 
 
 class TypeDefinition(object):
@@ -84,6 +94,13 @@ class TypeDefinition(object):
             raise TypeError()
         return value
 
+    def ddb_dump_inner(self, value):
+        """
+        If this is a set type, dump a value to the type contained in the set
+
+        """
+        return value
+
     def ddb_dump(self, value):
         """ Dump a value to a form that can be stored in DynamoDB """
         return value
@@ -93,13 +110,83 @@ class TypeDefinition(object):
         return value
 
     def __repr__(self):
-        return u'TypeDefinition(%s)' % self.data_type
+        return u'TypeDefinition(%s)' % self
 
     def __unicode__(self):
         return unicode(self.data_type)
 
     def __str__(self):
         return unicode(self).encode('utf-8')
+
+
+class SetType(TypeDefinition):
+
+    """ Set types """
+    data_type = set
+    mutable = True
+
+    def __init__(self, item_type=None, type_class=None):
+        self.item_type = item_type
+        set_map = {
+            STRING: STRING_SET,
+            NUMBER: NUMBER_SET,
+            BINARY: BINARY_SET,
+        }
+        if item_type is not None and type_class is None:
+            self.item_field = ALL_TYPES[item_type]()
+            self.ddb_data_type = set_map[self.item_field.ddb_data_type]
+        elif type_class is not None:
+            self.item_field = type_class()
+            self.ddb_data_type = set_map[self.item_field.ddb_data_type]
+        else:
+            self.item_field = None
+            self.ddb_data_type = STRING_SET
+        super(SetType, self).__init__()
+
+    def coerce(self, value, force):
+        if not isinstance(value, set):
+            if force:
+                value = set(value)
+            else:
+                raise TypeError()
+        if self.item_field is not None:
+            converted_values = set()
+            for item in value:
+                converted_values.add(self.item_field.coerce(item, force))
+            return converted_values
+        return value
+
+    def ddb_dump_inner(self, value):
+        """ We need to expose this for 'contains' and 'ncontains' """
+        if self.item_field is None:
+            return value
+        return self.item_field.ddb_dump(value)
+
+    def ddb_dump(self, value):
+        if self.item_field is None:
+            return value
+        return set([self.ddb_dump_inner(v) for v in value])
+
+    def ddb_load(self, value):
+        if self.item_field is None:
+            return value
+        return set([self.item_field.ddb_load(v) for v in value])
+
+    def __unicode__(self):
+        if self.item_type is None:
+            return super(SetType, self).__unicode__()
+        else:
+            return unicode(set([self.item_type]))
+
+    @classmethod
+    def bind(cls, item_type):
+        """ Create a set factory that will contain a specific data type """
+        return functools.partial(cls, item_type)
+
+register_type(SetType, allow_in_set=False)
+ALL_TYPES[STRING_SET] = SetType.bind(STRING)
+ALL_TYPES[BINARY_SET] = SetType.bind(BINARY)
+ALL_TYPES[NUMBER_SET] = SetType.bind(NUMBER)
 
 
 class NumberType(TypeDefinition):
@@ -283,27 +370,6 @@ class BinaryType(TypeDefinition):
         return value.value
 
 register_type(BinaryType)
-
-
-class SetType(TypeDefinition):
-
-    """ Set types """
-    data_type = set
-    aliases = [BINARY_SET, STRING_SET, NUMBER_SET]
-    # It's fine to just use a single set type because it will never be used in
-    # schema definitions (which is the only place we really use ddb_data_type)
-    ddb_data_type = STRING_SET
-    mutable = True
-
-    def coerce(self, value, force):
-        if not isinstance(value, set):
-            if force:
-                return set(value)
-            else:
-                raise TypeError()
-        return value
-
-register_type(SetType)
 
 
 class DictType(TypeDefinition):

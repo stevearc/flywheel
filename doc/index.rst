@@ -34,4 +34,4 @@ TODO
 ====
 * release to pypi
 * Cross-table linking (One and Many)
-* Sets of custom data types (e.g. dates)
+* Fields should be able to set nullable=False

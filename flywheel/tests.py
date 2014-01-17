@@ -112,7 +112,7 @@ class DynamoLocalPlugin(nose.plugins.Plugin):
                 print self._dynamo_local.stdout.read()
 
 
-class BaseSystemTest(unittest.TestCase):
+class DynamoSystemTest(unittest.TestCase):
 
     """ Base class for tests that need an :class:`~flywheel.engine.Engine` """
     dynamo = None
@@ -120,7 +120,7 @@ class BaseSystemTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(BaseSystemTest, cls).setUpClass()
+        super(DynamoSystemTest, cls).setUpClass()
         logging.getLogger('boto').setLevel(logging.WARNING)
         cls.engine = Engine(cls.dynamo, ['test'])
         cls.engine.register(*cls.models)
@@ -128,10 +128,10 @@ class BaseSystemTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super(BaseSystemTest, cls).tearDownClass()
+        super(DynamoSystemTest, cls).tearDownClass()
         cls.engine.delete_schema()
 
     def tearDown(self):
-        super(BaseSystemTest, self).tearDown()
+        super(DynamoSystemTest, self).tearDown()
         for model in self.engine.models.itervalues():
             self.engine.scan(model).delete()

@@ -1,7 +1,7 @@
 """ Tests for engine queries """
 
-from . import BaseSystemTest
 from flywheel import Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex
+from flywheel.tests import DynamoSystemTest
 
 
 class User(Model):
@@ -50,7 +50,7 @@ class Post(Model):
             setattr(self, key, val)
 
 
-class TestQueries(BaseSystemTest):
+class TestQueries(DynamoSystemTest):
 
     """ Tests for table queries """
     models = [User]
@@ -295,7 +295,7 @@ class TestQueries(BaseSystemTest):
                 .index('score-index').all()
 
 
-class TestCompositeQueries(BaseSystemTest):
+class TestCompositeQueries(DynamoSystemTest):
 
     """ Tests for table queries """
     models = [Post]
@@ -393,7 +393,7 @@ class Widget(Model):
             setattr(self, key, val)
 
 
-class TestOrder(BaseSystemTest):
+class TestOrder(DynamoSystemTest):
 
     """ Test results ordering """
     models = [Widget]
@@ -438,7 +438,7 @@ class SingleKeyModel(Model):
         self.id = id
 
 
-class TestEngine(BaseSystemTest):
+class TestEngine(DynamoSystemTest):
 
     """ Tests for misc engine functionality """
     models = [Post, SingleKeyModel]

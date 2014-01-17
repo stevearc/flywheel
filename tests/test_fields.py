@@ -8,9 +8,9 @@ from flywheel.fields.types import DictType, S3Type, Key, register_type
 from moto import mock_s3
 
 import boto
-from . import BaseSystemTest
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
-                      NUMBER_SET, BINARY_SET, Binary, GlobalIndex)
+                      NUMBER_SET, BINARY_SET, Binary, GlobalIndex, set_)
+from flywheel.tests import DynamoSystemTest
 
 
 try:
@@ -144,9 +144,9 @@ class TestFieldCoerce(unittest.TestCase):
     def test_int_no_data_loss(self):
         """ Int fields refuse to drop floating point data """
         field = Field(data_type=int, coerce=True)
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             field.coerce(4.5)
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             field.coerce(Decimal('4.5'))
 
     def test_int_coerce(self):
@@ -165,7 +165,7 @@ class TestFieldCoerce(unittest.TestCase):
     def test_int_coerce_long(self):
         """ Int fields can transparently handle longs """
         field = Field(data_type=int)
-        val = 100L
+        val = 100
         ret = field.coerce(val)
         self.assertEqual(ret, val)
 
@@ -277,8 +277,43 @@ class TestFieldCoerce(unittest.TestCase):
         self.assertTrue(isinstance(ret, Key))
         self.assertEqual(ret.key, 'my/path')
 
+    def test_coerce_basic_set(self):
+        """ Coerce to an untyped set """
+        field = Field(data_type=set, coerce=True)
+        ret = field.coerce(['a', 'b'])
+        self.assertEqual(ret, set(['a', 'b']))
 
-class TestFields(BaseSystemTest):
+    def test_coerce_basic_set_fail(self):
+        """ Coercing to untyped set fails """
+        field = Field(data_type=set)
+        with self.assertRaises(TypeError):
+            field.coerce(['a', 'b'])
+
+    def test_coerce_number_set(self):
+        """ Coerce to number set """
+        field = Field(data_type=set_(int), coerce=True)
+        ret = field.coerce([2, '4'])
+        self.assertEqual(ret, set([2, 4]))
+
+    def test_coerce_number_set_fail(self):
+        """ Coerce to number set fails """
+        field = Field(data_type=set_(int))
+        with self.assertRaises(TypeError):
+            field.coerce([2, '4'])
+
+    def test_coerce_binary_set(self):
+        """ Coerce to binary set """
+        field = Field(data_type=set_(str), coerce=True)
+        ret = field.coerce([u'hello'])
+        self.assertEqual(ret, set([b'hello']))
+
+    def test_set_defn_with_frozenset(self):
+        """ Can use frozenset as data type for set fields """
+        field = Field(data_type=frozenset([date]))
+        self.assertEqual(field.data_type.item_type, date)
+
+
+class TestFields(DynamoSystemTest):
 
     """ Tests for fields """
     models = [Widget]
@@ -529,7 +564,7 @@ class PrimitiveWidget(Model):
             setattr(self, key, val)
 
 
-class TestPrimitiveDataTypes(BaseSystemTest):
+class TestPrimitiveDataTypes(DynamoSystemTest):
 
     """ Tests for default values """
     models = [PrimitiveWidget]

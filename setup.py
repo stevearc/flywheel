@@ -20,10 +20,12 @@ if sys.version_info[:2] < (2, 7):
 if __name__ == "__main__":
     setup(
         name='flywheel',
+        version=git_version('flywheel'),
         description="Object mapper for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
             'Programming Language :: Python',
+            'Programming Language :: Python :: 2',
             'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
             'Intended Audience :: Developers',
@@ -35,7 +37,7 @@ if __name__ == "__main__":
         keywords='aws dynamo dynamodb orm odm',
         zip_safe=False,
         include_package_data=True,
-        packages=find_packages(),
+        packages=find_packages(exclude=('tests',)),
         entry_points={
             'nose.plugins': [
                 'dynamolocal=flywheel.tests:DynamoLocalPlugin',
@@ -43,5 +45,4 @@ if __name__ == "__main__":
         },
         install_requires=REQUIREMENTS,
         tests_require=REQUIREMENTS,
-        **git_version()
     )

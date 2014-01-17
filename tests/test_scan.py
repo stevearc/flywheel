@@ -3,12 +3,12 @@ from datetime import datetime, date, timedelta
 
 from decimal import Decimal
 
-from . import BaseSystemTest
 from .test_queries import User
 from flywheel import Model, Field
+from flywheel.tests import DynamoSystemTest
 
 
-class TestScan(BaseSystemTest):
+class TestScan(DynamoSystemTest):
 
     """ Tests for table scans """
     models = [User]
@@ -135,7 +135,7 @@ class TestScan(BaseSystemTest):
         self.assertEquals(results, [u])
 
 
-class TestScanFilterOverflow(BaseSystemTest):
+class TestScanFilterOverflow(DynamoSystemTest):
 
     """ Filter tests on overflow fields """
     models = [User]
@@ -268,6 +268,7 @@ class Widget(Model):
     isawesome = Field(data_type=bool)
     name = Field(data_type=str)
     friends = Field(data_type=set)
+    dates = Field(data_type=frozenset([date]))
     data = Field(data_type=dict)
     queue = Field(data_type=list)
     created = Field(data_type=datetime)
@@ -280,7 +281,7 @@ class Widget(Model):
             setattr(self, key, val)
 
 
-class TestFilterFields(BaseSystemTest):
+class TestFilterFields(DynamoSystemTest):
 
     """ Test query filters for every data type """
     models = [Widget]
@@ -806,8 +807,17 @@ class TestFilterFields(BaseSystemTest):
             .filter(Widget.friends.ncontains_('b')).first()
         self.assertEquals(ret, w)
 
-    # DICT
+    def test_contains_date_set(self):
+        """ Can use 'contains' filter on date set fields """
+        some_date = date(2012, 4, 8)
+        f = set([some_date])
+        w = Widget(dates=f)
+        self.engine.save(w)
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.dates.contains_(some_date)).first()
+        self.assertEquals(ret, w)
 
+    # DICT
     def test_eq_dict(self):
         """ Cannot use equality filter on dict fields """
         d = {'foo': 'bar'}

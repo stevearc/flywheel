@@ -3,9 +3,9 @@ import json
 from decimal import Decimal
 from mock import patch, ANY
 
-from . import BaseSystemTest
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
+from flywheel.tests import DynamoSystemTest
 
 
 class Widget(Model):
@@ -65,7 +65,7 @@ class Post(Model):
         self.about = about
 
 
-class TestComposite(BaseSystemTest):
+class TestComposite(DynamoSystemTest):
 
     """ Tests for composite fields """
     models = [Widget, Post]
@@ -153,7 +153,7 @@ class Article(Model):
             setattr(self, key, val)
 
 
-class TestModelMutation(BaseSystemTest):
+class TestModelMutation(DynamoSystemTest):
 
     """ Tests for model mutation methods """
     models = [Post, Article]
@@ -640,7 +640,7 @@ class Store(Model):
         .include_index('profit-index', ['name', 'num_employees'])
 
 
-class TestCreate(BaseSystemTest):
+class TestCreate(DynamoSystemTest):
 
     """ Test model throughput settings """
     models = [Store]
