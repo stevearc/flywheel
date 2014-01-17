@@ -141,12 +141,12 @@ class UpdateVersion(Command):
         ('dev', None, "Don't fail on development versions"),
         ('strict', None, "Convert development version strings to follow "
          "PEP440"),
-        ('no-strip', None, "Don't attempt to remove all references to "
+        ('no-purge', None, "Don't attempt to remove all references to "
          "version helper"),
         ('version-mod', None, "The file to write version constants to "
          "(default _version.py) (hybrid mode only)"),
     ]
-    boolean_options = ['strict', 'pre', 'dev', 'no-strip']
+    boolean_options = ['strict', 'pre', 'dev', 'no-purge']
 
     def initialize_options(self):
         self.tag_match = None
@@ -154,7 +154,7 @@ class UpdateVersion(Command):
         self.strict = 0
         self.pre = 0
         self.dev = 0
-        self.no_strip = 0
+        self.no_purge = 0
         self.package = None
         self.version_mod = '_version.py'
 
@@ -183,7 +183,7 @@ class UpdateVersion(Command):
             'version': version_data['version']
         }
         is_hybrid = replace_dynamic_with_static(version_data['version'])
-        if not self.no_strip:
+        if not self.no_purge:
             print("Removing %s from setup.py and MANIFEST.in" % __name__)
             remove_all_references()
         if is_hybrid:
@@ -271,29 +271,25 @@ def replace_dynamic_with_static(version):
     True
 
     """
-    replaced = False
     filename = os.path.join(os.path.curdir, 'setup.py')
-    for line in fileinput.FileInput(filename, inplace=True):
-        if 'git_version' in line:
-            replaced = True
-            if 'import' in line:
-                pass
-            else:
-                print(re.sub(r'git_version\s*\(.+\)', "'%s'" %
-                      version, line), end='')
-        else:
-            print(line, end='')
-    return replaced
+    with open(filename, 'r') as ifile:
+        setup = ifile.read()
+
+    new_setup = re.sub(r'git_version\s*\([^\)]*\)', "'%s'" % version, setup)
+    if new_setup != setup:
+        with open(filename, 'w') as ofile:
+            ofile.write(new_setup)
+        return True
+    return False
 
 
 def remove_all_references():
     """ Remove all references to version helper from this package """
     filename = os.path.join(os.path.curdir, 'setup.py')
     import_line = re.compile(r'^(from {0} import|import {0})'.format(__name__))
-    cmd_line = re.compile(r'^\s*cmdclass\s*=')
     for line in fileinput.FileInput(filename, inplace=True):
-        if not import_line.match(line) and not cmd_line.match(line):
-            print(line, end='')
+        if not import_line.match(line):
+            print(line.replace('UpdateVersion', 'None'), end='')
 
     manifest_file = os.path.join(os.path.curdir, 'MANIFEST.in')
     for line in fileinput.FileInput(manifest_file, inplace=True):
@@ -454,7 +450,7 @@ def git_version_data(tag_match='[0-9]*', post_process=None, strict=False):
     else:
         version = version_data['tag']
     version_data['version'] = version
-    version_data['is_prerelease'] = bool(re.match(r'^\d+(\.\d+)*$', version))
+    version_data['is_prerelease'] = re.match(r'^\d+(\.\d+)*$', version) is None
 
     return version_data
 

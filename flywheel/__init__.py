@@ -1,6 +1,6 @@
 """ flywheel """
 try:
-    from ._version import *  # pylint: disable=F0401,W0401
+    from ._version import __version__  # pylint: disable=F0401
 except ImportError:  # pragma: no cover
     __version__ = 'unknown'
 

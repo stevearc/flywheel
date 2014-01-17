@@ -1,19 +1,12 @@
 Getting Started
 ===============
-To install flywheel, you will need to clone the repository and install the
-package.  The easiest way to do this is using `devbox
-<https://github.com/mathcamp/devbox>`_::
-
-    wget https://raw.github.com/mathcamp/devbox/master/devbox/unbox.py && \
-    python unbox.py git@github.com:mathcamp/flywheel
-
-This will clone the repo and install it into a virtualenv named flywheel_env. You can now install flywheel into any virtualenv with:
+Flywheel can be installed with pip
 
 .. code-block:: bash
 
-    pip install path/to/flywheel
+    pip install flywheel
 
-Here are the very first steps you need to take to get started with flywheel:
+Here are the steps to set up a simple example model with flywheel:
 
 .. code-block:: python
 
@@ -83,4 +76,6 @@ If you want to change a field, just make the change and sync it:
     tweet.link = 'http://www.smbc-comics.com'
     tweet.sync()
 
-That's enough to get you started. Look around if you'd like more details about :ref:`writing queries<queries>` or :ref:`how updates work<crud>`
+That's enough to give you a taste. The rest of the docs have more information
+on :ref:`creating models <model_basics>`, :ref:`writing queries<queries>`, or :ref:`how
+updates work<crud>`.

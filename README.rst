@@ -1,13 +1,20 @@
 flywheel
 =========
-:Build: |build|_ |coverage|_
+:Master Build: |build|_ |coverage|_
+:0.1 Build: |build-0.1|_ |coverage-0.1|_
 :Documentation: http://flywheel.readthedocs.org/en/latest/
+:Downloads: http://pypi.python.org/pypi/flywheel
 :Source: https://github.com/mathcamp/flywheel
 
 .. |build| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=master
 .. _build: https://travis-ci.org/mathcamp/flywheel
 .. |coverage| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=master
 .. _coverage: https://coveralls.io/r/mathcamp/flywheel?branch=master
+
+.. |build-0.1| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=0.1
+.. _build-0.1: https://travis-ci.org/mathcamp/flywheel
+.. |coverage-0.1| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=0.1
+.. _coverage-0.1: https://coveralls.io/r/mathcamp/flywheel?branch=0.1
 
 Object mapper for Amazon's DynamoDB
 

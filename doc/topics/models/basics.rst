@@ -1,3 +1,5 @@
+.. _model_basics:
+
 Model Basics
 ============
 This is what a model looks like:

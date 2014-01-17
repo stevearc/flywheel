@@ -16,6 +16,27 @@ User Guide
     topics/crud
     topics/develop
 
+Versions
+--------
+=========  ===============  ========
+Version    Build            Coverage
+=========  ===============  ========
+master_    |build-master|_  |coverage-master|_
+0.1.0_     |build-0.1.0|_   |coverage-0.1.0|_
+=========  ===============  ========
+
+.. _master: ../latest/
+.. |build-master| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=master
+.. _build-master: https://travis-ci.org/mathcamp/flywheel
+.. |coverage-master| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=master
+.. _coverage-master: https://coveralls.io/r/mathcamp/flywheel?branch=master
+
+.. _0.1.0: ../0.1.0/
+.. |build-0.1.0| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=0.1.0
+.. _build-0.1.0: https://travis-ci.org/mathcamp/flywheel
+.. |coverage-0.1.0| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=0.1.0
+.. _coverage-0.1.0: https://coveralls.io/r/mathcamp/flywheel?branch=0.1.0
+
 API Reference
 -------------
 .. toctree::
@@ -23,6 +44,15 @@ API Reference
     :glob:
 
     ref/flywheel
+
+Changelog
+---------
+
+.. toctree::
+    :maxdepth: 1
+    :glob:
+
+    changes
 
 Indices and tables
 ==================
@@ -33,7 +63,5 @@ Indices and tables
 
 TODO
 ====
-* query objects should be iterable
-* release to pypi
 * Cross-table linking (One and Many)
 * Fields should be able to set nullable=False
