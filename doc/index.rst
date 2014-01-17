@@ -14,6 +14,7 @@ User Guide
     topics/models
     topics/queries
     topics/crud
+    topics/develop
 
 API Reference
 -------------
