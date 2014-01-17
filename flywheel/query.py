@@ -57,6 +57,10 @@ class Query(object):
             else:
                 yield self.model.ddb_load_(self.engine, result)
 
+    def __iter__(self):
+        for item in self.gen():
+            yield item
+
     def all(self, desc=False, consistent=False, attributes=None):
         """
         Return the query results as a list

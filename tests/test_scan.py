@@ -1,6 +1,7 @@
 """ Tests for table scans """
 from datetime import datetime, date, timedelta
 
+import inspect
 from decimal import Decimal
 
 from .test_queries import User
@@ -23,6 +24,30 @@ class TestScan(DynamoSystemTest):
         self.assertEquals(len(results), 2)
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
+
+    def test_gen(self):
+        """ Scan can get a generator for items """
+        u = User(id='a', name='Adam')
+        u2 = User(id='b', name='Billy')
+        self.engine.save([u, u2])
+
+        results = self.engine.scan(User).gen()
+        self.assertTrue(inspect.isgenerator(results))
+        results = list(results)
+        self.assertEquals(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
+
+    def test_iter(self):
+        """ Scan can iterate over items """
+        u = User(id='a', name='Adam')
+        u2 = User(id='b', name='Billy')
+        self.engine.save([u, u2])
+
+        users = [u, u2]
+        for item in self.engine.scan(User):
+            self.assertTrue(item in users)
+            users.remove(item)
 
     def test_limit(self):
         """ Scan can have a limit """

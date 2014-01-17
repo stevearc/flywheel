@@ -87,6 +87,17 @@ class TestQueries(DynamoSystemTest):
         with self.assertRaises(ValueError):
             self.engine(User).filter(id='a').one()
 
+    def test_iter(self):
+        """ Queries can iterate over items """
+        u = User(id='a', name='Adam')
+        u2 = User(id='a', name='Aaron')
+        self.engine.save([u, u2])
+
+        users = [u, u2]
+        for item in self.engine.query(User).filter(id='a'):
+            self.assertTrue(item in users)
+            users.remove(item)
+
     def test_force_hash_key(self):
         """ Queries must specify hash key """
         u = User(id='a', name='Adam')
