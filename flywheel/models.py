@@ -274,13 +274,13 @@ class Model(object):
         """ All declared fields and any additional fields """
         return self.meta_.fields.keys() + self._overflow.keys()
 
-    def cached_(self, name):
+    def cached_(self, name, default=None):
         """ Get the cached (server) value of a field """
         if not self.persisted_:
-            return None
+            return default
         if name in self.__cache__:
             return self.__cache__[name]
-        return getattr(self, name, None)
+        return getattr(self, name, default)
 
     def incr_(self, **kwargs):
         """ Atomically increment a number value """
@@ -309,10 +309,10 @@ class Model(object):
                     self.__cache__.setdefault(name, getattr(self, name))
                     if name != key:
                         self.__dirty__.add(name)
-                self.__dict__[key] = self.cached_(key) + self.__incrs__[key]
+                self.__dict__[key] = self.cached_(key, 0) + self.__incrs__[key]
             else:
                 self.__cache__.setdefault(key, getattr(self, key, 0))
-                self._overflow[key] = self.cached_(key) + self.__incrs__[key]
+                self._overflow[key] = self.cached_(key, 0) + self.__incrs__[key]
 
     def add_(self, **kwargs):
         """ Atomically add to a set """

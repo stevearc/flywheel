@@ -146,6 +146,7 @@ class Article(Model):
     """ Super simple test model """
     title = Field(hash_key=True)
     text = Field()
+    views = Field(data_type=int)
 
     def __init__(self, title='Drugs win Drug War', **kwargs):
         self.title = title
@@ -449,6 +450,27 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(ts=6, foobar=3)
         self.assertEquals(p.ts, 10)
         self.assertEquals(p.foobar, 3)
+
+    def test_incr_unpersisted(self):
+        """ Calling incr_ on unpersisted item merges with existing data """
+        a = Article(views=2)
+        self.engine.save(a)
+        a = Article()
+        a.incr_(views=4)
+        self.engine.sync(a)
+        a = self.engine.scan(Article).first()
+        self.assertEqual(a.views, 6)
+
+    def test_incr_unpersisted_overflow(self):
+        """ Calling incr_ on unpersisted item overflow field merges data """
+        a = Article()
+        a.num = 2
+        self.engine.save(a)
+        a = Article()
+        a.incr_(num=4)
+        self.engine.sync(a)
+        a = self.engine.scan(Article).first()
+        self.assertEqual(a.num, 6)
 
     def test_incr_composite_piece(self):
         """ Incrementing a field will change any dependent composite fields """
