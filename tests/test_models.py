@@ -6,6 +6,10 @@ from mock import patch, ANY
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
 from flywheel.tests import DynamoSystemTest
+try:
+    import unittest2 as unittest  # pylint: disable=F0401
+except ImportError:
+    import unittest
 
 
 class Widget(Model):
@@ -752,3 +756,13 @@ class TestCreate(DynamoSystemTest):
             throughput = index['ProvisionedThroughput']
             self.assertEquals(throughput['ReadCapacityUnits'], 3)
             self.assertEquals(throughput['WriteCapacityUnits'], 3)
+
+
+class TestModelMethods(unittest.TestCase):
+
+    """ Unit tests for simple model operations """
+
+    def test_comparison_with_none(self):
+        """ Comparing a model to None should not throw exception """
+        model = Article()
+        self.assertNotEqual(model, None)
