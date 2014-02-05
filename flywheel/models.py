@@ -479,7 +479,8 @@ class Model(object):
         return hash(self.hk_) + hash(self.rk_)
 
     def __eq__(self, other):
-        return (self.meta_.name == other.meta_.name and self.hk_ == other.hk_
+        return (isinstance(other, self.__class__)
+                and self.meta_.name == other.meta_.name and self.hk_ == other.hk_
                 and self.rk_ == other.rk_)
 
     def __ne__(self, other):
