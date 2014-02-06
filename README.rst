@@ -1,5 +1,5 @@
 flywheel
-=========
+========
 :Master Build: |build|_ |coverage|_
 :0.1 Build: |build-0.1|_ |coverage-0.1|_
 :Documentation: http://flywheel.readthedocs.org/

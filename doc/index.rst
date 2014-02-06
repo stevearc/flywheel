@@ -44,6 +44,8 @@ master_    |build-master|_  |coverage-master|_
 .. |coverage-0.1.1| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=0.1.1
 .. _coverage-0.1.1: https://coveralls.io/r/mathcamp/flywheel?branch=0.1.1
 
+Code lives here: https://github.com/mathcamp/flywheel
+
 API Reference
 -------------
 .. toctree::
