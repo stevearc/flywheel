@@ -1,5 +1,6 @@
 """ Tests for engine queries """
-
+from six.moves import xrange as _xrange  # pylint: disable=F0401
+import six
 from flywheel import Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex
 from flywheel.tests import DynamoSystemTest
 
@@ -409,7 +410,7 @@ class TestOrder(DynamoSystemTest):
 
     def _add_widgets(self):
         """ Add a bunch of widgets with different alpha/beta values """
-        for i in xrange(10):
+        for i in _xrange(10):
             w = Widget('a', str(i), alpha=i)
             w.beta = (i + 5) % 10
             self.engine.save(w)

@@ -1,10 +1,9 @@
 """ Model metadata and metaclass objects """
+import six
 import time
 
 import inspect
-from boto.dynamodb2.fields import HashKey, RangeKey, BaseSchemaField
-from boto.dynamodb2.table import Table
-from boto.exception import JSONResponseError
+from dynamo3 import DynamoKey, LocalIndex, GlobalIndex, Throughput
 from collections import defaultdict
 
 from .fields import Field
@@ -33,7 +32,7 @@ class Ordering(object):
         self.index_name = index_name
 
     def query_kwargs(self, **kwargs):
-        """ Get the boto query kwargs for querying against this index """
+        """ Get the query kwargs for querying against this index """
         kwargs = {'%s__eq' % self.hash_key.name:
                   self.hash_key.resolve(scope=kwargs)}
         if self.index_name is not None:
@@ -64,7 +63,7 @@ def merge_metadata(cls):
     for base in cls.__bases__:
         meta.update(getattr(base, '__metadata__', {}))
     # Don't merge any keys that start with '_'
-    for key in meta.keys():
+    for key in list(meta.keys()):
         if key.startswith('_'):
             del meta[key]
     meta.update(cls_meta)
@@ -84,14 +83,17 @@ class ModelMetaclass(type):
         cls = super(ModelMetaclass, mcs).__new__(mcs, name, bases, dct)
 
         cls.__metadata__ = merge_metadata(cls)
-        cls.__on_create__()
+        if hasattr(cls, '__on_create__'):
+            cls.__on_create__()
 
-        cls.meta_ = cls.__metadata_class__(cls)
-        cls.meta_.post_create()
-        cls.meta_.validate_model()
-        cls.meta_.post_validate()
+        if hasattr(cls, '__metadata_class__'):
+            cls.meta_ = cls.__metadata_class__(cls)
+            cls.meta_.post_create()
+            cls.meta_.validate_model()
+            cls.meta_.post_validate()
 
-        cls.__after_create__()
+        if hasattr(cls, '__after_create__'):
+            cls.__after_create__()
 
         return cls
 
@@ -137,9 +139,12 @@ class ModelMetadata(object):
         self._name = model.__name__
         self.global_indexes = []
         self.orderings = []
-        self.throughput = {'read': 5, 'write': 5}
+        self.throughput = Throughput()
         self._abstract = False
         self.__dict__.update(model.__metadata__)
+        # Allow throughput to be specified as read/write in a dict
+        if isinstance(self.throughput, dict):
+            self.throughput = Throughput(**self.throughput)
         self.name = self._name
         self.fields = {}
         self.hash_key = None
@@ -168,7 +173,7 @@ class ModelMetadata(object):
 
         self.orderings.append(self.__order_class__(self, self.hash_key,
                                                    self.range_key))
-        for field in self.fields.itervalues():
+        for field in six.itervalues(self.fields):
             if field.index:
                 order = self.__order_class__(self, self.hash_key, field,
                                              field.index_name)
@@ -199,7 +204,7 @@ class ModelMetadata(object):
                 if subfield.composite:
                     update_related(subfield, name)
 
-        for field in self.fields.itervalues():
+        for field in six.itervalues(self.fields):
             self.related_fields[field.name].add(field.name)
             if field.composite:
                 update_related(field, field.name)
@@ -292,7 +297,7 @@ class ModelMetadata(object):
         """ Get the dynamo primary key dict for an item """
         # If we can unambiguously tell that a single string defines the primary
         # key, allow scope to be a single string
-        if (obj is None and isinstance(scope, basestring) and
+        if (obj is None and isinstance(scope, six.string_types) and
                 self.range_key is None):
             scope = {self.hash_key.name: scope}
 
@@ -318,12 +323,6 @@ class ModelMetadata(object):
         if self.abstract:
             return None
         return '-'.join(self.namespace + [self.name])
-
-    def ddb_table(self, connection):
-        """ Construct a Dynamo table from a connection """
-        if self.abstract:
-            return None
-        return Table(self.ddb_tablename, connection=connection)
 
     def validate_model(self):
         """ Perform validation checks on the model declaration """
@@ -366,7 +365,7 @@ class ModelMetadata(object):
 
         Parameters
         ----------
-        connection : :class:`~boto.dynamodb2.layer1.DynamoDBConnection`
+        connection : :class:`~dynamo3.DynamoDBConnection`
         tablenames : list, optional
             List of tables that already exist. Will call 'describe' if not
             provided.
@@ -389,64 +388,45 @@ class ModelMetadata(object):
         if self.abstract:
             return None
         if tablenames is None:
-            tablenames = connection.list_tables()['TableNames']
+            tablenames = set(connection.list_tables())
         if self.ddb_tablename in tablenames:
             return None
         elif test:
             return self.ddb_tablename
 
-        attrs = []
         indexes = []
         global_indexes = []
         hash_key = None
-        raw_attrs = {}
 
         if throughput is not None:
-            table_throughput = throughput
+            table_throughput = Throughput(throughput['read'],
+                                          throughput['write'])
         else:
             table_throughput = self.throughput
-        table_throughput = {
-            'ReadCapacityUnits': table_throughput['read'],
-            'WriteCapacityUnits': table_throughput['write'],
-        }
 
-        hash_key = HashKey(self.hash_key.name,
-                           data_type=self.hash_key.ddb_data_type)
-        schema = [hash_key.schema()]
-        for name, field in self.fields.iteritems():
-            if field.hash_key:
-                f = hash_key
-            elif field.range_key:
-                f = RangeKey(name, data_type=field.ddb_data_type)
-                schema.append(f.schema())
-            elif field.index:
-                idx = field.get_boto_index(hash_key)
-                f = idx.parts[1]
-                indexes.append(idx.schema())
-            elif any(map(lambda x: name in x, self.global_indexes)):
-                f = BaseSchemaField(name, data_type=field.ddb_data_type)
-            else:
-                continue
-            attrs.append(f.definition())
-            raw_attrs[name] = f
+        hash_key = DynamoKey(self.hash_key.name,
+                             data_type=self.hash_key.ddb_data_type)
+        range_key = None
+        if self.range_key is not None:
+            range_key = DynamoKey(self.range_key.name,
+                                  data_type=self.range_key.ddb_data_type)
+        for field in six.itervalues(self.fields):
+            if field.index:
+                idx = field.get_ddb_index()
+                indexes.append(idx)
 
         for gindex in self.global_indexes:
-            index = gindex.get_boto_index(self.fields)
+            index = gindex.get_ddb_index(self.fields)
             if throughput is not None and gindex.name in throughput:
-                index.throughput = throughput[gindex.name]
-            global_indexes.append(index.schema())
+                index.throughput = Throughput(**throughput[gindex.name])
+            global_indexes.append(index)
 
-        # Make sure indexes & global indexes either have data or are None
-        indexes = indexes or None
-        global_indexes = global_indexes or None
         if not test:
-            connection.create_table(
-                attrs, self.ddb_tablename, schema, table_throughput,
-                local_secondary_indexes=indexes,
-                global_secondary_indexes=global_indexes)
+            connection.create_table(self.ddb_tablename, hash_key, range_key,
+                                    indexes, global_indexes, table_throughput)
             if wait:
                 desc = connection.describe_table(self.ddb_tablename)
-                while desc['Table']['TableStatus'] != 'ACTIVE':
+                while desc.status != 'ACTIVE':
                     time.sleep(1)
                     desc = connection.describe_table(self.ddb_tablename)
 
@@ -459,7 +439,7 @@ class ModelMetadata(object):
 
         Parameters
         ----------
-        connection : :class:`~boto.dynamodb2.layer1.DynamoDBConnection`
+        connection : :class:`~dynamo3.DynamoDBConnection`
         tablenames : list, optional
             List of tables that already exist. Will call 'describe' if not
             provided.
@@ -477,19 +457,14 @@ class ModelMetadata(object):
         if self.abstract:
             return None
         if tablenames is None:
-            tablenames = connection.list_tables()['TableNames']
+            tablenames = set(connection.list_tables())
 
         if self.ddb_tablename in tablenames:
             if not test:
-                self.ddb_table(connection).delete()
+                connection.delete_table(self.ddb_tablename)
                 if wait:
-                    try:
-                        connection.describe_table(self.ddb_tablename)
-                        while True:
-                            time.sleep(1)
-                            connection.describe_table(self.ddb_tablename)
-                    except JSONResponseError as e:
-                        if e.status != 400:
-                            raise
+                    desc = connection.describe_table(self.ddb_tablename)
+                    while desc is not None:
+                        desc = connection.describe_table(self.ddb_tablename)
             return self.ddb_tablename
         return None

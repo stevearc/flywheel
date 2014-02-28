@@ -1,5 +1,9 @@
 Changelog
 =========
+0.2.0
+-----
+* **Breakage**: Removing S3Type (no longer have boto as dependency)
+* Feature: Support Python 3.2 and 3.3
 
 0.1.3
 -----

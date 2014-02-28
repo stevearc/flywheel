@@ -1,13 +1,14 @@
 """ Model code """
+import six
 import contextlib
 import copy
-from boto.dynamodb2.types import Dynamizer
+import itertools
 
+from dynamo3 import is_null
 from .fields import Field, NUMBER
 from .model_meta import ModelMetaclass, ModelMetadata, Ordering
 
-
-DYNAMIZER = Dynamizer()
+# pylint: disable=E1002
 
 
 class SetDelta(object):
@@ -77,7 +78,7 @@ class SetDelta(object):
                                  "set in the same update")
 
 
-class Model(object):
+class Model(six.with_metaclass(ModelMetaclass)):
 
     """
     Base class for all tube models
@@ -107,7 +108,6 @@ class Model(object):
         Mapping of fields to atomic add/delete operations for numbers and sets.
 
     """
-    __metaclass__ = ModelMetaclass
     __metadata_class__ = ModelMetadata
     __metadata__ = {
         '_abstract': True,
@@ -129,7 +129,7 @@ class Model(object):
             setattr(self, self.meta_.hash_key.name, args[0])
         if len(args) > 1:
             setattr(self, self.meta_.range_key.name, args[1])
-        for key, value in kwargs.iteritems():
+        for key, value in six.iteritems(kwargs):
             setattr(self, key, value)
 
     def refresh(self, consistent=False):
@@ -167,10 +167,10 @@ class Model(object):
         obj = super(Model, cls).__new__(cls)
         mark_dirty = []
         with obj.loading_():
-            for name, field in cls.meta_.fields.iteritems():
+            for name, field in six.iteritems(cls.meta_.fields):
                 if not field.composite:
                     setattr(obj, name, field.default)
-                    if not field.is_null(field.default):
+                    if not is_null(field.default):
                         mark_dirty.append(name)
         obj.__dirty__.update(mark_dirty)
         obj._overflow = {}
@@ -284,7 +284,7 @@ class Model(object):
 
     def keys_(self):
         """ All declared fields and any additional fields """
-        return self.meta_.fields.keys() + self._overflow.keys()
+        return itertools.chain(self.meta_.fields.keys(), self._overflow.keys())
 
     def cached_(self, name, default=None):
         """ Get the cached (server) value of a field """
@@ -296,7 +296,7 @@ class Model(object):
 
     def incr_(self, **kwargs):
         """ Atomically increment a number value """
-        for key, val in kwargs.iteritems():
+        for key, val in six.iteritems(kwargs):
             if ((self.meta_.hash_key.name in self.meta_.related_fields[key])
                     or (self.meta_.range_key is not None and
                         self.meta_.range_key.name in
@@ -324,7 +324,8 @@ class Model(object):
                 self.__dict__[key] = self.cached_(key, 0) + self.__incrs__[key]
             else:
                 self.__cache__.setdefault(key, getattr(self, key, 0))
-                self._overflow[key] = self.cached_(key, 0) + self.__incrs__[key]
+                self._overflow[key] = self.cached_(
+                    key, 0) + self.__incrs__[key]
 
     def add_(self, **kwargs):
         """ Atomically add to a set """
@@ -336,7 +337,7 @@ class Model(object):
 
     def mutate_(self, action, **kwargs):
         """ Atomically mutate a set """
-        for key, val in kwargs.iteritems():
+        for key, val in six.iteritems(kwargs):
             field = self.meta_.fields.get(key)
             if field is not None:
                 if not field.is_set:
@@ -365,7 +366,7 @@ class Model(object):
     def pre_save_(self, engine):
         """ Called before saving items """
         self.__engine__ = engine
-        for field in self.meta_.fields.itervalues():
+        for field in six.itervalues(self.meta_.fields):
             if field.check is not None:
                 val = field.resolve(self)
                 if not field.check(val):
@@ -445,25 +446,19 @@ class Model(object):
                 obj.set_ddb_val_(key, val)
         return obj
 
+    def ddb_dump_cached_(self, name):
+        """ Dump a cached field to a Dynamo-friendly value """
+        val = self.cached_(name)
+        if name in self.meta_.fields:
+            return self.meta_.fields[name].ddb_dump(val)
+        else:
+            return Field.ddb_dump_overflow(val)
+
     def construct_ddb_expects_(self, fields=None):
         """ Construct a dynamo "expects" mapping based on the cached fields """
-        expected = {}
         if fields is None:
             fields = self.keys_()
-        for name in fields:
-            cache_val = self.cached_(name)
-            expect = {
-                'Exists': not Field.is_null(cache_val),
-            }
-            field = self.meta_.fields.get(name)
-            if field is not None:
-                cache_val = field.ddb_dump(cache_val)
-            else:
-                cache_val = Field.ddb_dump_overflow(cache_val)
-            if expect['Exists']:
-                expect['Value'] = DYNAMIZER.encode(cache_val)
-            expected[name] = expect
-        return expected
+        return dict(((name, self.ddb_dump_cached_(name)) for name in fields))
 
     @classmethod
     def field_(cls, name):
@@ -483,7 +478,7 @@ class Model(object):
         data = {}
         for name in self.meta_.fields:
             data[name] = getattr(self, name)
-        for key, val in self._overflow.iteritems():
+        for key, val in six.iteritems(self._overflow):
             data[key] = val
         return data
 

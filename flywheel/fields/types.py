@@ -1,13 +1,14 @@
 """ Field type definitions """
+import six
 import functools
 import datetime
 
 import json
-import boto.s3.key
-from boto.dynamodb.types import Binary, float_to_decimal
-from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
-                                  STRING_SET, BINARY_SET)
+from dynamo3 import (Binary, NUMBER, STRING, BINARY, NUMBER_SET, STRING_SET,
+                     BINARY_SET)
+from dynamo3.types import float_to_decimal
 from decimal import Decimal
+from flywheel.compat import UnicodeMixin
 
 
 ALL_TYPES = {}
@@ -29,7 +30,7 @@ def register_type(type_class, allow_in_set=True):
         ALL_TYPES[set_(alias)] = SetType.bind(alias)
 
 
-class TypeDefinition(object):
+class TypeDefinition(UnicodeMixin):
 
     """
     Base class for all Field types
@@ -110,13 +111,10 @@ class TypeDefinition(object):
         return value
 
     def __repr__(self):
-        return u'TypeDefinition(%s)' % self
+        return 'TypeDefinition(%s)' % self
 
     def __unicode__(self):
-        return unicode(self.data_type)
-
-    def __str__(self):
-        return unicode(self).encode('utf-8')
+        return six.text_type(self.data_type)
 
 
 class SetType(TypeDefinition):
@@ -176,7 +174,7 @@ class SetType(TypeDefinition):
         if self.item_type is None:
             return super(SetType, self).__unicode__()
         else:
-            return unicode(set([self.item_type]))
+            return six.text_type(set([self.item_type]))
 
     @classmethod
     def bind(cls, item_type):
@@ -196,8 +194,8 @@ class NumberType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def coerce(self, value, force):
-        if not (isinstance(value, float) or isinstance(value, int) or
-                isinstance(value, long) or isinstance(value, Decimal)):
+        if not (isinstance(value, float) or isinstance(value, Decimal) or
+                isinstance(value, six.integer_types)):
             if force:
                 try:
                     return int(value)
@@ -227,7 +225,7 @@ class FloatType(TypeDefinition):
     def coerce(self, value, force):
         if not isinstance(value, float):
             # Auto-convert ints, longs, and Decimals
-            if (isinstance(value, int) or isinstance(value, long) or
+            if (isinstance(value, six.integer_types) or
                     isinstance(value, Decimal)):
                 return float(value)
             elif force:
@@ -249,7 +247,7 @@ class IntType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def coerce(self, value, force):
-        if not (isinstance(value, int) or isinstance(value, long)):
+        if not isinstance(value, six.integer_types):
             if force:
                 new_val = int(value)
                 if isinstance(value, float) or isinstance(value, Decimal):
@@ -327,17 +325,17 @@ register_type(BoolType)
 class StringType(TypeDefinition):
 
     """ String values, stored as unicode """
-    data_type = unicode
+    data_type = six.text_type
     aliases = [STRING]
     ddb_data_type = STRING
 
     def coerce(self, value, force):
-        if not isinstance(value, unicode):
+        if not isinstance(value, six.text_type):
             # Silently convert str to unicode using utf-8
-            if isinstance(value, str):
+            if isinstance(value, six.binary_type):
                 return value.decode('utf-8')
             if force:
-                return unicode(value)
+                return six.text_type(value)
             else:
                 raise TypeError()
         return value
@@ -348,17 +346,17 @@ register_type(StringType)
 class BinaryType(TypeDefinition):
 
     """ Binary strings, stored as a str """
-    data_type = str
-    aliases = [BINARY, Binary, bytes]
+    data_type = six.binary_type
+    aliases = [BINARY, Binary]
     ddb_data_type = BINARY
 
     def coerce(self, value, force):
-        if not isinstance(value, str):
+        if not isinstance(value, six.binary_type):
             # Silently convert unicode to str using utf-8
-            if isinstance(value, unicode):
+            if isinstance(value, six.text_type):
                 return value.encode('utf-8')
             if force:
-                return str(value)
+                return six.binary_type(value)
             else:
                 raise TypeError()
         return value
@@ -456,120 +454,3 @@ class DateType(TypeDefinition):
         return datetime.date.fromtimestamp(value)
 
 register_type(DateType)
-
-
-class Key(boto.s3.key.Key):
-
-    """ Subclass of boto S3 key that adds equality operators """
-
-    def __hash__(self):
-        return hash(self.key)
-
-    def __eq__(self, other):
-        return self.key == getattr(other, 'key', None)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def copy_data_from_key(self, key):
-        """ Copy the data from a boto Key """
-        for attr in ('name', 'metadata', 'cache_control', 'content_type',
-                     'content_encoding', 'content_disposition',
-                     'content_language', 'filename', 'etag', 'is_latest',
-                     'last_modified', 'owner', 'storage_class', 'path', 'resp',
-                     'mode', 'size', 'version_id', 'source_version_id',
-                     'delete_marker', 'encrypted', 'ongoing_restore',
-                     'expiry_date', 'local_hashes'):
-            setattr(self, attr, getattr(key, attr))
-
-
-class S3Type(TypeDefinition):
-
-    """
-    Store a link to an S3 key
-
-    Parameters
-    ----------
-    bucket : str
-        The name of the S3 bucket
-    scheme : str, optional
-        The name of the scheme to use to connect to S3 if the bucket is a
-        string. (default 'default'). See :meth:`~.set_scheme` for more
-        information.
-
-    """
-    ddb_data_type = STRING
-    mutable = True
-    SCHEMES = {
-        'default': {},
-    }
-    _connections = {}
-
-    def __init__(self, bucket, scheme='default'):
-        super(S3Type, self).__init__()
-        self._bucket_name = bucket
-        self._bucket = None
-        self._scheme = scheme
-
-    @property
-    def bucket(self):
-        """ Getter for S3 bucket """
-        if self._bucket is None:
-            self._bucket = self._get_bucket(self._bucket_name, self._scheme)
-        return self._bucket
-
-    @classmethod
-    def _get_bucket(cls, bucket, scheme):
-        """ Get a connection to an S3 bucket """
-        if scheme not in cls.SCHEMES:
-            raise KeyError("Could not find S3 connection scheme '%s'. "
-                           "Have you registered it with S3Type.set_scheme?"
-                           % scheme)
-        if scheme not in cls._connections:
-            cls._connections[scheme] = boto.connect_s3(**cls.SCHEMES[scheme])
-        return cls._connections[scheme].get_bucket(bucket, validate=False)
-
-    @classmethod
-    def set_scheme(cls, name, **kwargs):
-        """
-        Register a S3 connection scheme
-
-        The connection scheme is a collection of keyword arguments that will be
-        passed to :meth:`~boto.connect_s3` when creating a S3 connection.
-
-        Parameters
-        ----------
-        name : str
-            The name of the scheme. If the name is 'default', then that scheme
-            will be used when no scheme is explicitly passed to the
-            constructor.
-        **kwargs : dict
-            All keyword arguments
-
-        """
-        cls.SCHEMES[name] = kwargs
-
-    def coerce(self, value, force):
-        """ S3Type will auto-coerce string types """
-        if not isinstance(value, Key):
-            # silently convert boto Keys to our subclass
-            if isinstance(value, boto.s3.key.Key):
-                key = Key(self.bucket)
-                key.copy_data_from_key(value)
-                return key
-            # Silently convert strings
-            if isinstance(value, basestring):
-                key = Key(self.bucket)
-                key.key = value
-                return key
-            else:
-                raise TypeError()
-        return value
-
-    def ddb_dump(self, value):
-        return value.key
-
-    def ddb_load(self, value):
-        key = Key(self.bucket)
-        key.key = value
-        return key

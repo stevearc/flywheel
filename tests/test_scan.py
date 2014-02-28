@@ -1,4 +1,5 @@
 """ Tests for table scans """
+import six
 from datetime import datetime, date, timedelta
 
 import inspect
@@ -287,11 +288,11 @@ class Widget(Model):
 
     """ Test model with every data type """
     id = Field(hash_key=True)
-    school = Field(data_type=unicode)
+    school = Field(data_type=six.text_type)
     count = Field(data_type=int)
     score = Field(data_type=float)
     isawesome = Field(data_type=bool)
-    name = Field(data_type=str)
+    name = Field(data_type=six.binary_type)
     friends = Field(data_type=set)
     dates = Field(data_type=frozenset([date]))
     data = Field(data_type=dict)

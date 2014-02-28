@@ -1,4 +1,5 @@
 """ Query constraints """
+import six
 
 
 class Condition(object):
@@ -28,9 +29,9 @@ class Condition(object):
     def scan_kwargs(self):
         """ Get the kwargs for doing a table scan """
         kwargs = {}
-        for key, val in self.eq_fields.iteritems():
+        for key, val in six.iteritems(self.eq_fields):
             kwargs["%s__eq" % key] = val
-        for key, (op, val) in self.fields.iteritems():
+        for key, (op, val) in six.iteritems(self.fields):
             kwargs["%s__%s" % (key, op)] = val
         if self.limit is not None:
             kwargs['limit'] = self.limit
@@ -39,7 +40,7 @@ class Condition(object):
     def query_kwargs(self, model):
         """ Get the kwargs for doing a table query """
         scan_only = set(['contains', 'ncontains', 'null', 'in', 'ne'])
-        for op, _ in self.fields.itervalues():
+        for op, _ in six.itervalues(self.fields):
             if op in scan_only:
                 raise ValueError("Operation '%s' cannot be used in a query!" %
                                  op)
@@ -51,13 +52,13 @@ class Condition(object):
                 self.fields.keys())
 
         if ordering is None:
-            raise ValueError("Bad query arguments. You must provide a hash key "
-                             "and may optionally constrain on exactly one "
+            raise ValueError("Bad query arguments. You must provide a hash "
+                             "key and may optionally constrain on exactly one "
                              "range key")
         kwargs = ordering.query_kwargs(**self.eq_fields)
         if ordering.range_key is not None:
             if len(self.fields) > 0:
-                key, (op, val) = self.fields.items()[0]
+                key, (op, val) = six.next(six.iteritems(self.fields))
                 kwargs['%s__%s' % (key, op)] = val
             else:
                 try:

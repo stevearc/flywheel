@@ -1,6 +1,6 @@
 """ Index definitions """
-from boto.dynamodb2.fields import (HashKey, RangeKey, GlobalAllIndex,
-                                   GlobalKeysOnlyIndex, GlobalIncludeIndex)
+from dynamo3 import DynamoKey, Throughput
+from dynamo3 import GlobalIndex as GIndex
 
 
 class GlobalIndex(object):
@@ -26,8 +26,8 @@ class GlobalIndex(object):
         self.name = name
         self.hash_key = hash_key
         self.range_key = range_key
-        self._throughput = {'read': 5, 'write': 5}
-        self.boto_index = GlobalAllIndex
+        self._throughput = Throughput()
+        self.ddb_index = GIndex.all
         self.kwargs = {}
 
     @classmethod
@@ -39,7 +39,7 @@ class GlobalIndex(object):
     def keys(cls, name, hash_key, range_key=None):
         """ Project key attributes into the index """
         index = cls(name, hash_key, range_key)
-        index.boto_index = GlobalKeysOnlyIndex
+        index.ddb_index = GIndex.keys
         return index
 
     @classmethod
@@ -47,23 +47,20 @@ class GlobalIndex(object):
         """ Select which attributes to project into the index """
         includes = includes or []
         index = cls(name, hash_key, range_key)
-        index.boto_index = GlobalIncludeIndex
+        index.ddb_index = GIndex.include
         index.kwargs['includes'] = includes
         return index
 
-    def get_boto_index(self, fields):
-        """ Get the boto index class for this GlobalIndex """
-        hash_key = HashKey(self.hash_key,
-                           data_type=fields[self.hash_key].ddb_data_type)
-        parts = [hash_key]
+    def get_ddb_index(self, fields):
+        """ Get the dynamo index class for this GlobalIndex """
+        hash_key = DynamoKey(self.hash_key,
+                             data_type=fields[self.hash_key].ddb_data_type)
+        range_key = None
         if self.range_key is not None:
-            range_key = RangeKey(self.range_key,
-                                 data_type=fields[self.range_key].ddb_data_type)
-            parts.append(range_key)
-        index = self.boto_index(self.name, parts, **self.kwargs)
-        # Throughput has to be patched on afterwards due to bug in
-        # GlobalIncludeIndex
-        index.throughput = self._throughput
+            range_key = DynamoKey(self.range_key,
+                                  data_type=fields[self.range_key].ddb_data_type)
+        index = self.ddb_index(self.name, hash_key, range_key,
+                               throughput=self._throughput, **self.kwargs)
         return index
 
     def throughput(self, read=5, write=5):
@@ -89,10 +86,7 @@ class GlobalIndex(object):
                 }
 
         """
-        self._throughput = {
-            'read': read,
-            'write': write,
-        }
+        self._throughput = Throughput(read, write)
         return self
 
     def __contains__(self, field):

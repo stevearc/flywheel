@@ -3,5 +3,3 @@ pep8
 nose
 coverage
 mock
-httpretty
-moto
