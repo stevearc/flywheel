@@ -13,6 +13,7 @@ Submodules
 
 .. toctree::
 
+   flywheel.compat
    flywheel.engine
    flywheel.model_meta
    flywheel.models

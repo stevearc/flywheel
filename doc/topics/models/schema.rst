@@ -16,7 +16,7 @@ unique identifier for each object.
 **Local Secondary Indexes**: Optional, up to 5. You may only use these if your
 table has a range key. These fields are indexed in a similar fashion as the
 range key. You may also query against them within a specific hash key. You can
-think of these as a range key with no uniqueness requirements.
+think of these as range keys with no uniqueness requirements.
 
 **Global Secondary Indexes**: Optional, up to 5. These indexes have a hash key
 and optional range key, and can be put on any declared field. This allows you
@@ -34,7 +34,8 @@ Example declaration of hash and range key:
         userid = Field(hash_key=True)
         ts = Field(data_type=datetime, range_key=True)
 
-For this version of a Tweet, each ``(userid, ts)`` pair is a unique value.
+For this version of a Tweet, each ``(userid, ts)`` pair is a unique value. The
+Dynamo table will be sharded across userids.
 
 Local Secondary Indexes
 -----------------------
@@ -44,9 +45,9 @@ optimize how much additional storage is used. The projection types are:
 
 **All**: All fields are projected into the index
 
-**Keys only**: Only the primary key and indexed keys are project into the index
+**Keys only**: Only the primary key and indexed keys are projected into the index
 
-**Include**: Like the "Keys only" projection, but allows you to specify
+**Include**: Like the "keys only" projection, but allows you to specify
 additional fields to project into the index
 
 This is how they it looks in the model declaration:
@@ -80,13 +81,11 @@ can be specified in the model declaration. Here are some examples below:
     class Tweet(Model):
         __metadata__ = {
             'global_indexes': [
-                GlobalIndex.all('ts-index', 'city', 'ts').throughput(read=10,
-                                                                     write=2),
+                GlobalIndex.all('ts-index', 'city', 'ts').throughput(read=10, write=2),
                 GlobalIndex.keys('rt-index', 'city', 'retweets')\
                         .throughput(read=10, write=2),
                 GlobalIndex.include('like-index', 'city', 'likes',
-                                    includes=['text']).throughput(read=10,
-                                                                  write=2),
+                                    includes=['text']).throughput(read=10, write=2),
             ],
         }
         userid = Field(hash_key=True)

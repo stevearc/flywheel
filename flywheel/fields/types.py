@@ -244,6 +244,7 @@ class IntType(TypeDefinition):
 
     """ Integer values (includes longs) """
     data_type = int
+    aliases = list(six.integer_types)
     ddb_data_type = NUMBER
 
     def coerce(self, value, force):
