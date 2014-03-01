@@ -301,9 +301,8 @@ class Widget(Model):
     price = Field(data_type=Decimal)
 
     def __init__(self, **kwargs):
-        self.id = 'abc'
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
+        kwargs.setdefault('id', 'abc')
+        super(Widget, self).__init__(**kwargs)
 
 
 class TestFilterFields(DynamoSystemTest):

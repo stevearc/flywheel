@@ -122,6 +122,16 @@ class Model(object):
     _persisted = False
     _loading = False
 
+    def __init__(self, *args, **kwargs):
+        if len(args) > 2 or len(args) > 1 and self.meta_.range_key is None:
+            raise TypeError("Too many positional arguments!")
+        if len(args) > 0:
+            setattr(self, self.meta_.hash_key.name, args[0])
+        if len(args) > 1:
+            setattr(self, self.meta_.range_key.name, args[1])
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
+
     def refresh(self, consistent=False):
         """ Overwrite model data with freshest from database """
         if self.__engine__ is None:

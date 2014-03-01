@@ -19,7 +19,7 @@ except ImportError:
     import unittest
 
 
-DYNAMO_LOCAL = 'https://s3-us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_2013-12-12.tar.gz'
+DYNAMO_LOCAL = 'https://s3-us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_2014-01-08.tar.gz'
 
 
 class DynamoLocalPlugin(nose.plugins.Plugin):
@@ -86,7 +86,7 @@ class DynamoLocalPlugin(nose.plugins.Plugin):
                 lib_path = os.path.join(self.path, 'DynamoDBLocal_lib')
                 jar_path = os.path.join(self.path, 'DynamoDBLocal.jar')
                 cmd = [self.java, '-Djava.library.path=' + lib_path, '-jar',
-                       jar_path, '--port', str(self.port)]
+                       jar_path, '--port', str(self.port), '--inMemory']
                 self._dynamo_local = subprocess.Popen(cmd,
                                                       stdout=subprocess.PIPE,
                                                       stderr=subprocess.STDOUT)
