@@ -16,13 +16,23 @@ The model declares the fields an object has, their :ref:`data
 types<data_types>`, and the :ref:`schema <schema>` of the table.
 
 Since DynamoDB is a NoSQL database, you can attach arbitrary additional fields
-to the model, and they will be stored appropriately. For example, this tweet
-doesn't declare a ``retweets`` field, but you could assign it anyway:
+(undeclared fields) to the model, and they will be stored appropriately. For
+example, this tweet doesn't declare a ``retweets`` field, but you could assign
+it anyway:
 
 .. code-block:: python
 
-    tweet = Tweet()
     tweet.retweets = 7
+    tweet.sync()
+
+Undeclared fields will **not** be saved if they begin or end with an
+underscore. This is intentional behavior so you can set local-only variables on
+your models.
+
+.. code-block:: python
+
+    tweet.retweets = 7  # this is saved to Dynamo
+    tweet._last_updated = datetime.utcnow()  # this is NOT saved to Dynamo
 
 Since models define the schema of a table, you can use them to create or delete
 tables. Every model has a ``meta_`` field attached to it which contains
@@ -43,16 +53,3 @@ You can also register your models with the engine and create all the tables at o
 
     engine.register(User, Tweet, Message)
     engine.create_schema()
-
-When you define your model, you can specify the throughput it will be
-provisioned with when created:
-
-.. code-block:: python
-
-    class Tweet(Model):
-        __metadata__ = {
-            'throughput': {
-                'read': 10,
-                'write': 5,
-            },
-        }

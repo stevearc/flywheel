@@ -28,6 +28,7 @@ class Widget(Model):
     c_range = Composite('userid', 'id', range_key=True)
     c_index = Composite('userid', 'id', index='comp-index')
     c_plain = Composite('userid', 'id')
+    _c_private = Composite('userid', 'id')
     id = Field()
     ts = Field(data_type=NUMBER)
 
@@ -138,6 +139,12 @@ class TestComposite(DynamoSystemTest):
         result = self.engine(Post).filter(c_all=p.c_all)\
             .index('score-index').first()
         self.assertIsNone(result)
+
+    def test_private_composite(self):
+        """ Composite fields can be private """
+        w = Widget('a', 'b', 1)
+        self.engine.save(w)
+        self.assertEqual(w.c_plain, w._c_private)
 
 
 class Article(Model):

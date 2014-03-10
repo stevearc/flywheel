@@ -178,10 +178,6 @@ class Model(object):
         return obj
 
     def __setattr__(self, name, value):
-        if name.startswith('_') or name.endswith('_'):
-            # Don't interfere with private fields
-            super(Model, self).__setattr__(name, value)
-            return
         if self.persisted_:
             if ((self.meta_.hash_key.name in self.meta_.related_fields[name])
                     or (self.meta_.range_key is not None and
@@ -192,9 +188,9 @@ class Model(object):
                         "Cannot change an item's primary key!")
                 else:
                     return
-        self.mark_dirty_(name)
         field = self.meta_.fields.get(name)
         if field is not None:
+            self.mark_dirty_(name)
             # Ignore if trying to set a composite field
             if not field.composite:
                 if (not self._loading and self.persisted_ and
@@ -203,7 +199,12 @@ class Model(object):
                         cached_var = copy.copy(getattr(self, related))
                         self.__cache__[related] = cached_var
                 super(Model, self).__setattr__(name, field.coerce(value))
+        elif name.startswith('_') or name.endswith('_'):
+            # Don't interfere with non-Field private attrs
+            super(Model, self).__setattr__(name, value)
+            return
         else:
+            self.mark_dirty_(name)
             if (not self._loading and self.persisted_ and name not in
                     self.__cache__):
                 if Field.is_overflow_mutable(value):
@@ -213,19 +214,20 @@ class Model(object):
             self._overflow[name] = value
 
     def __delattr__(self, name):
-        if name.startswith('_') or name.endswith('_'):
-            # Don't interfere with private fields
-            super(Model, self).__delattr__(name)
-            return
         field = self.meta_.fields.get(name)
         if field is not None:
             if not field.composite:
                 setattr(self, name, None)
+        elif name.startswith('_') or name.endswith('_'):
+            # Don't interfere with non-Field private attrs
+            super(Model, self).__delattr__(name)
+            return
         else:
             setattr(self, name, None)
 
     def __getattribute__(self, name):
-        if not name.startswith('_') and not name.endswith('_'):
+        if not name.startswith('__') and not name.endswith('_'):
+            # Don't interfere with magic attrs or attrs ending in '_'
             field = self.meta_.fields.get(name)
             # Intercept getattribute to construct composite fields on the fly
             if field is not None and field.composite:
