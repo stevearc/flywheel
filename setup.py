@@ -3,7 +3,6 @@ import os
 import sys
 
 from setuptools import setup, find_packages
-from flywheel_version import git_version, UpdateVersion
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -27,7 +26,7 @@ if sys.version_info[:2] < (2, 7):
 if __name__ == "__main__":
     setup(
         name='flywheel',
-        version=git_version('flywheel'),
+        version='0.1.1',
         description="SQLAlchemy-style ORM for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
@@ -49,7 +48,6 @@ if __name__ == "__main__":
         platforms='any',
         include_package_data=True,
         packages=find_packages(exclude=('tests',)),
-        cmdclass={'update_version': UpdateVersion},
         entry_points={
             'nose.plugins': [
                 'dynamolocal=flywheel.tests:DynamoLocalPlugin',
