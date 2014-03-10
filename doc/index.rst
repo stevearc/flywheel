@@ -18,6 +18,8 @@ User Guide
     topics/crud
     topics/develop
 
+    changes
+
 API Reference
 -------------
 .. toctree::
@@ -25,15 +27,6 @@ API Reference
     :glob:
 
     ref/flywheel
-
-Changelog
----------
-
-.. toctree::
-    :maxdepth: 1
-    :glob:
-
-    changes
 
 Indices and tables
 ==================

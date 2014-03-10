@@ -1,3 +1,6 @@
+Changelog
+=========
+
 0.1.2
 -----
 * Bug fix: Field names can begin with an underscore (:sha:`637f1ee`, :issue:`7`)
