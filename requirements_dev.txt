@@ -10,3 +10,4 @@ mock
 httpretty
 moto
 bumpversion
+wheel
