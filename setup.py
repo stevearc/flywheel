@@ -9,7 +9,7 @@ import re
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, 'README.rst')).read()
-CHANGES = open(os.path.join(HERE, 'doc/changes.rst')).read()
+CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 # Remove custom RST extensions for pypi
 CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
