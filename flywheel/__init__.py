@@ -1,5 +1,5 @@
 """ flywheel """
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 import boto.dynamodb.types
 from boto.dynamodb2.exceptions import ConditionalCheckFailedException
