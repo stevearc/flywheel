@@ -249,9 +249,9 @@ class TestModelMutation(DynamoSystemTest):
             p.foobar = set('a')
             p.points = Decimal('2')
             p.sync(raise_on_conflict=False)
-            updates = [ItemUpdate.put('foobar', ANY),
-                       ItemUpdate.put('points', ANY)]
-            self.assertItemsEqual(updates, captured_updates)
+            self.assertEqual(len(captured_updates), 2)
+            self.assertTrue(ItemUpdate.put('foobar', ANY) in captured_updates)
+            self.assertTrue(ItemUpdate.put('points', ANY) in captured_updates)
 
     def test_delete(self):
         """ Model can delete itself """
