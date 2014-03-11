@@ -30,6 +30,7 @@ class Post(Model):
         'global_indexes': [
             GlobalIndex('name-index', 'username', 'score'),
             GlobalIndex('ts-index', 'username', 'ts'),
+            GlobalIndex('hash-index', 'total_uid')
         ],
     }
     uid = Composite('type', 'id', hash_key=True)
@@ -40,6 +41,8 @@ class Post(Model):
     username = Field()
     ts = Field(data_type=NUMBER, default=0)
     upvotes = Field(data_type=NUMBER, default=0)
+    total_uid = Composite('uid', 'username', merge=lambda x, y: x + ':' +
+                          str(y))
 
 
 class TestQueries(DynamoSystemTest):
@@ -379,6 +382,15 @@ class TestCompositeQueries(DynamoSystemTest):
         with self.assertRaises(ValueError):
             self.engine(Post).filter(Post.username == 'a')\
                 .filter(Post.upvotes == 4).all()
+
+    def test_no_range(self):
+        """ Can query on an index even if there is no range key """
+        p = Post(type='tweet', id='1234', username='abc')
+        self.engine.save(p)
+
+        ret = self.engine.query(Post).filter(id='1234', type='tweet',
+                                             username='abc').all()
+        self.assertEqual(ret, [p])
 
 
 class Widget(Model):

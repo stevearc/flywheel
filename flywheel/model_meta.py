@@ -211,7 +211,10 @@ class ModelMetadata(object):
         Parameters
         ----------
         eq_fields : list
+            List of field names that are constrained with '='.
         fields : list
+            List of field names that are constrained with inequality operators
+            ('>', '<', 'beginswith', etc)
 
         Returns
         -------
@@ -226,25 +229,38 @@ class ModelMetadata(object):
         orderings = []
         for order in self.orderings:
             needed = order.hash_key.can_resolve(eq_fields)
+            # hash key could not be satisfied
             if len(needed) == 0:
                 continue
+            remaining = set(eq_fields) - needed
 
-            # If there are no non-equality fields, range key must be in the
-            # eq_fields
-            if len(fields) == 0:
-                rng_fields = set(eq_fields)
-                rng_needed = order.range_key.can_resolve(rng_fields)
-                # hash and range key must use all eq_fields
-                if len(set(eq_fields) - needed - rng_needed) != 0:
+            if order.range_key is None:
+                # If the ordering has no range key, it must be satisfied
+                # entirely by the hash key
+                if len(remaining) > 0 or len(fields) > 0:
                     continue
+                else:
+                    orderings.append(order)
+                    continue
+
             else:
-                # If there are eq_fields left over, continue
-                if len(set(eq_fields) - needed) != 0 or len(fields) > 1:
-                    continue
-                if order.range_key.name not in fields:
-                    continue
+                # If there are no non-equality fields, range key must be in the
+                # eq_fields
+                if len(fields) == 0:
+                    rng_fields = set(eq_fields)
+                    rng_needed = order.range_key.can_resolve(rng_fields)
+                    # hash and range key must use all eq_fields
+                    if len(remaining - rng_needed) != 0:
+                        continue
+                else:
+                    # If there are eq_fields left over, continue
+                    # If there is more than 1 inequality constraint, continue
+                    if len(remaining) != 0 or len(fields) > 1:
+                        continue
+                    if order.range_key.name not in fields:
+                        continue
 
-            orderings.append(order)
+                orderings.append(order)
 
         if len(orderings) > 1:
             for order in orderings:
