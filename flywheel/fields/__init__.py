@@ -261,9 +261,12 @@ class Field(object):
 
         """
         needed = set()
+        # If this field name is found in the fields, that is all that's needed
         if self.name in fields:
             needed.add(self.name)
         elif self.subfields:
+            # Otherwise, we need ALL of the subfields (only non-empty for
+            # Composites) to recursively be satisfied
             for field in self.subfields:
                 resolve = self.model.meta_.fields[field].can_resolve(fields)
                 if not resolve:
