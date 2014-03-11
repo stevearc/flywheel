@@ -71,7 +71,7 @@ class TestQueries(DynamoSystemTest):
         self.assertEquals(result, u)
 
     def test_one_many(self):
-        """ If no results, first() returns None """
+        """ If many results, one() raises ValueError """
         u = User(id='a', name='Adam')
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
@@ -82,6 +82,14 @@ class TestQueries(DynamoSystemTest):
         """ If no results, one() raises exception """
         with self.assertRaises(ValueError):
             self.engine(User).filter(id='a').one()
+
+    def test_count(self):
+        """ Can return a count instead of the models """
+        u = User(id='a', name='Adam')
+        u2 = User(id='a', name='Aaron')
+        self.engine.save([u, u2])
+        count = self.engine(User).filter(id='a').count()
+        self.assertEqual(count, 2)
 
     def test_iter(self):
         """ Queries can iterate over items """

@@ -48,6 +48,10 @@ class Query(object):
             List of fields to retrieve from dynamo. If supplied, gen() will
             iterate over dicts instead of model objects.
 
+        Returns
+        -------
+        results : generator
+
         """
         kwargs = self.condition.query_kwargs(self.model)
         if attributes is not None:
@@ -78,9 +82,25 @@ class Query(object):
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
 
+        Returns
+        -------
+        results : list
+
         """
         return list(self.gen(desc=desc, consistent=consistent,
                              attributes=attributes))
+
+    def count(self):
+        """
+        Find the number of elements the match this query
+
+        Returns
+        -------
+        count : int
+
+        """
+        kwargs = self.condition.query_kwargs(self.model)
+        return self.dynamo.query(self.tablename, count=True, **kwargs)
 
     def first(self, desc=False, consistent=False, attributes=None):
         """
@@ -95,6 +115,10 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
+
+        Returns
+        -------
+        result : :class:`~flywheel.models.Model` or None
 
         """
         self.limit(1)
@@ -115,6 +139,10 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
+
+        Returns
+        -------
+        result : :class:`~flywheel.models.Model`
 
         Raises
         ------
@@ -218,6 +246,10 @@ class Scan(Query):
                 yield result
             else:
                 yield self.model.ddb_load_(self.engine, result)
+
+    def count(self):
+        kwargs = self.condition.scan_kwargs()
+        return self.dynamo.scan(self.tablename, count=True, **kwargs)
 
     def index(self, name):
         raise TypeError("Scan cannot use an index!")

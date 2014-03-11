@@ -39,6 +39,16 @@ class TestScan(DynamoSystemTest):
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
 
+    def test_count(self):
+        """ Can return a count instead of the models """
+        u = User(id='a', name='Adam')
+        u2 = User(id='b', name='Billy')
+        self.engine.save([u, u2])
+        count = self.engine.scan(User).count()
+        self.assertEqual(count, 2)
+        count = self.engine.scan(User).filter(id='a').count()
+        self.assertEqual(count, 1)
+
     def test_iter(self):
         """ Scan can iterate over items """
         u = User(id='a', name='Adam')

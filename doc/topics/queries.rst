@@ -38,7 +38,7 @@ memory at the same time.
     for tweet in all_tweets:
         retweets += tweet.retweets
 
-there are two finalizing statements that retrieve a single item:
+There are two finalizing statements that retrieve a single item:
 :meth:`~flywheel.engine.Query.first` and :meth:`~flywheel.engine.Query.one`.
 Calling :meth:`~flywheel.engine.Query.first` will return the first element of
 the results, or None if there are no results. Calling
@@ -54,6 +54,15 @@ results it will raise a :class:`ValueError`.
     # Get a specific tweet and fail if missing
     tweet = engine.query(Tweet).filter(Tweet.userid == 'abc123',
                                        Tweet.id == '1234').one()
+
+There is one more finalizing statement: :meth:`~flywheel.engine.Query.count`.
+This will return the number of results that matched the query, instead of
+returning the results themselves.
+
+.. code-block:: python
+
+    # Get the number of tweets made by user abc123
+    num = engine.query(Tweet).filter(Tweet.userid == 'abc123').count()
 
 You can set a :meth:`~flywheel.engine.Query.limit` on a query to limit the
 number of results it returns:
