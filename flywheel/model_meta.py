@@ -155,6 +155,9 @@ class ModelMetadata(object):
         """ Create the orderings """
         for name, member in inspect.getmembers(self.model):
             if isinstance(member, Field):
+                if name.startswith('__') or name.endswith('_'):
+                    raise ValidationError("Field '%s' cannot begin with '__' "
+                                          "or end with '_'" % name)
                 self.fields[name] = member
                 member.name = name
                 member.model = self.model

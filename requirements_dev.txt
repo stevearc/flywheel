@@ -9,3 +9,5 @@ sphinx_rtd_theme
 mock
 httpretty
 moto
+bumpversion
+wheel

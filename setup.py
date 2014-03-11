@@ -1,14 +1,17 @@
 """ Setup file """
-import os
 import sys
 
 from setuptools import setup, find_packages
-from flywheel_version import git_version, UpdateVersion
+
+import os
+import re
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, 'README.rst')).read()
 CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
+# Remove custom RST extensions for pypi
+CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
 REQUIREMENTS = [
     'boto>=2.23.0',
@@ -27,8 +30,8 @@ if sys.version_info[:2] < (2, 7):
 if __name__ == "__main__":
     setup(
         name='flywheel',
-        version=git_version('flywheel'),
-        description="Object mapper for Amazon's DynamoDB",
+        version='0.1.2',
+        description="SQLAlchemy-style ORM for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
             'Development Status :: 4 - Beta',
@@ -42,12 +45,13 @@ if __name__ == "__main__":
             'Topic :: Database',
         ],
         author='Steven Arcangeli',
-        author_email='steven@highlig.ht',
+        author_email='stevearc@stevearc.com',
         url='http://flywheel.readthedocs.org/',
+        license='MIT',
         keywords='aws dynamo dynamodb orm odm',
+        platforms='any',
         include_package_data=True,
         packages=find_packages(exclude=('tests',)),
-        cmdclass={'update_version': UpdateVersion},
         entry_points={
             'nose.plugins': [
                 'dynamolocal=flywheel.tests:DynamoLocalPlugin',

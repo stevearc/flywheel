@@ -17,10 +17,6 @@ class User(Model):
     score = Field(data_type=NUMBER, index='score-index', default=0)
     str_set = Field(data_type=STRING_SET)
 
-    def __init__(self, **kwargs):
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
-
 
 def score_merge(ts, upvotes):
     """ Merge the ts and upvotes """
@@ -44,10 +40,6 @@ class Post(Model):
     username = Field()
     ts = Field(data_type=NUMBER, default=0)
     upvotes = Field(data_type=NUMBER, default=0)
-
-    def __init__(self, **kwargs):
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
 
 
 class TestQueries(DynamoSystemTest):
@@ -397,12 +389,6 @@ class Widget(Model):
     alpha = Field(data_type=int, index='alpha-index')
     beta = Field(data_type=int, index='beta-index')
 
-    def __init__(self, id=None, name=None, **kwargs):
-        self.id = id
-        self.name = name
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
-
 
 class TestOrder(DynamoSystemTest):
 
@@ -446,7 +432,7 @@ class SingleKeyModel(Model):
     id = Field(hash_key=True)
 
     def __init__(self, id='a'):
-        self.id = id
+        super(SingleKeyModel, self).__init__(id)
 
 
 class TestEngine(DynamoSystemTest):

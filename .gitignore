@@ -36,7 +36,6 @@ nosetests.xml
 .pydevproject
 flywheel_env
 .ropeproject
-_version.py
 _localhost.db
 
 # docs

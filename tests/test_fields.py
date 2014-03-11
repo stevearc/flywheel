@@ -60,9 +60,8 @@ class Widget(Model):
                        merge=lambda *a: '/'.join([x or '' for x in a]))
 
     def __init__(self, **kwargs):
-        self.string = 'abc'
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
+        kwargs.setdefault('string', 'abc')
+        super(Widget, self).__init__(**kwargs)
 
 
 class TestCreateFields(unittest.TestCase):
@@ -559,9 +558,8 @@ class PrimitiveWidget(Model):
     price = Field(data_type=Decimal)
 
     def __init__(self, **kwargs):
-        self.string = 'abc'
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
+        kwargs.setdefault('string', 'abc')
+        super(PrimitiveWidget, self).__init__(**kwargs)
 
 
 class TestPrimitiveDataTypes(DynamoSystemTest):

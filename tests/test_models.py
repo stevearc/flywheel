@@ -28,13 +28,12 @@ class Widget(Model):
     c_range = Composite('userid', 'id', range_key=True)
     c_index = Composite('userid', 'id', index='comp-index')
     c_plain = Composite('userid', 'id')
+    _c_private = Composite('userid', 'id')
     id = Field()
     ts = Field(data_type=NUMBER)
 
     def __init__(self, userid, id, ts):
-        self.userid = userid
-        self.id = id
-        self.ts = ts
+        super(Widget, self).__init__(userid, id=id, ts=ts)
 
 
 class Post(Model):
@@ -62,11 +61,8 @@ class Post(Model):
                          merge=lambda t, a: t.split() + a.split(), coerce=True)
 
     def __init__(self, userid, id, ts, text='foo', about='bar'):
-        self.userid = userid
-        self.id = id
-        self.ts = ts
-        self.text = text
-        self.about = about
+        super(Post, self).__init__(userid=userid, id=id, ts=ts, text=text,
+                                   about=about)
 
 
 class TestComposite(DynamoSystemTest):
@@ -144,6 +140,12 @@ class TestComposite(DynamoSystemTest):
             .index('score-index').first()
         self.assertIsNone(result)
 
+    def test_private_composite(self):
+        """ Composite fields can be private """
+        w = Widget('a', 'b', 1)
+        self.engine.save(w)
+        self.assertEqual(w.c_plain, w._c_private)
+
 
 class Article(Model):
 
@@ -153,9 +155,7 @@ class Article(Model):
     views = Field(data_type=int)
 
     def __init__(self, title='Drugs win Drug War', **kwargs):
-        self.title = title
-        for key, val in kwargs.iteritems():
-            setattr(self, key, val)
+        super(Article, self).__init__(title, **kwargs)
 
 
 class TestModelMutation(DynamoSystemTest):

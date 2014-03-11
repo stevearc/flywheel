@@ -1,8 +1,5 @@
 """ flywheel """
-try:
-    from ._version import __version__  # pylint: disable=F0401
-except ImportError:  # pragma: no cover
-    __version__ = 'unknown'
+__version__ = '0.1.2'
 
 import boto.dynamodb.types
 from boto.dynamodb2.exceptions import ConditionalCheckFailedException

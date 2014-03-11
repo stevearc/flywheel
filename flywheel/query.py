@@ -58,8 +58,7 @@ class Query(object):
                 yield self.model.ddb_load_(self.engine, result)
 
     def __iter__(self):
-        for item in self.gen():
-            yield item
+        return self.gen()
 
     def all(self, desc=False, consistent=False, attributes=None):
         """
