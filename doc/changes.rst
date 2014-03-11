@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.1.3
+-----
+* Bug fix: Some queries fail when global index has no range key (:issue:`9`, :sha:`edce6e2`)
+
 0.1.2
 -----
 * Bug fix: Field names can begin with an underscore (:sha:`637f1ee`, :issue:`7`)
