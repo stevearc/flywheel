@@ -152,20 +152,71 @@ class Engine(object):
                                  model.meta_.name)
             self.models[model.meta_.name] = model
 
-    def create_schema(self, test=False):
-        """ Create the DynamoDB tables required by the registered models """
+    def create_schema(self, test=False, throughput=None):
+        """
+        Create the DynamoDB tables required by the registered models
+
+        Parameters
+        ----------
+        test : bool, optional
+            If True, perform a dry run (default False)
+        throughput : dict, optional
+            If provided, override the throughputs of the Models when creating
+            them. Details below.
+
+        Returns
+        -------
+        names : list
+            List of table names that were created
+
+        Examples
+        --------
+        The ``throughput`` argument is a mapping of table names to their
+        throughputs. The throughput is a dict with a 'read' and 'write' value.
+        It may also include the names of global indexes that map to their own
+        dicts with a 'read' and 'write' value.
+
+        .. code-block:: python
+
+            engine.create_schema(throughput={
+                'table1': {
+                    'read': 4,
+                    'write': 10,
+                    'gindex-1': {
+                        'read': 6,
+                        'write': 3,
+                    }
+                }
+            })
+
+        """
+        throughput = throughput or {}
         tablenames = set(self.dynamo.list_tables())
         changed = []
         for model in six.itervalues(self.models):
-            result = model.meta_.create_dynamo_schema(self.dynamo, tablenames,
-                                                      test=test, wait=True,
-                                                      namespace=self.namespace)
+            result = model.meta_.create_dynamo_schema(
+                self.dynamo, tablenames, test=test, wait=True,
+                throughput=throughput.get(model.meta_.ddb_tablename()),
+                namespace=self.namespace)
             if result:
                 changed.append(result)
         return changed
 
     def delete_schema(self, test=False):
-        """ Drop the DynamoDB tables for all registered models """
+        """
+        Drop the DynamoDB tables for all registered models
+
+        Parameters
+        ----------
+        test : bool, optional
+            If True, perform a dry run (default False)
+
+        Returns
+        -------
+        names : list
+            List of table names that were deleted
+
+        """
         tablenames = set(self.dynamo.list_tables())
         changed = []
         for model in six.itervalues(self.models):
