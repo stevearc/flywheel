@@ -117,8 +117,6 @@ class ModelMetadata(object):
         __metadata__. Defaults to the name of the model class.
     abstract : bool
         If a model is abstract then it has no table in Dynamo
-    namespace : list
-        The namespace of this model. Set by the Engine.
     global_indexes : list
         List of global indexes (hash_key, [range_key]) pairs.
     related_fields : dict
@@ -132,7 +130,6 @@ class ModelMetadata(object):
 
     """
     __order_class__ = Ordering
-    namespace = []
 
     def __init__(self, model):
         self.model = model
@@ -317,12 +314,24 @@ class ModelMetadata(object):
         """ Getter for abstract """
         return self._abstract
 
-    @property
-    def ddb_tablename(self):
-        """ The name of the DynamoDB table """
+    def ddb_tablename(self, namespace=()):
+        """
+        The name of the DynamoDB table
+
+        Parameters
+        ----------
+        namespace : list or str, optional
+            String prefix or list of component parts of a prefix for the table
+            name.  The prefix will be this string or strings (joined by '-').
+
+        """
+        if isinstance(namespace, six.string_types):
+            namespace = (namespace,)
+        else:
+            namespace = tuple(namespace)
         if self.abstract:
             return None
-        return '-'.join(self.namespace + [self.name])
+        return '-'.join(namespace + (self.name,))
 
     def validate_model(self):
         """ Perform validation checks on the model declaration """
@@ -359,7 +368,7 @@ class ModelMetadata(object):
                                               "itself" % (name, field.name))
 
     def create_dynamo_schema(self, connection, tablenames=None, test=False,
-                             wait=False, throughput=None):
+                             wait=False, throughput=None, namespace=()):
         """
         Create all Dynamo tables for this model
 
@@ -378,6 +387,8 @@ class ModelMetadata(object):
             and 'write'. To specify throughput for global indexes, add the name
             of the index as a key and another 'read', 'write' dict as the
             value.
+        namespace : tuple, optional
+            The namespace of the table
 
         Returns
         -------
@@ -389,10 +400,11 @@ class ModelMetadata(object):
             return None
         if tablenames is None:
             tablenames = set(connection.list_tables())
-        if self.ddb_tablename in tablenames:
+        tablename = self.ddb_tablename(namespace)
+        if tablename in tablenames:
             return None
         elif test:
-            return self.ddb_tablename
+            return tablename
 
         indexes = []
         global_indexes = []
@@ -422,18 +434,18 @@ class ModelMetadata(object):
             global_indexes.append(index)
 
         if not test:
-            connection.create_table(self.ddb_tablename, hash_key, range_key,
+            connection.create_table(tablename, hash_key, range_key,
                                     indexes, global_indexes, table_throughput)
             if wait:
-                desc = connection.describe_table(self.ddb_tablename)
+                desc = connection.describe_table(tablename)
                 while desc.status != 'ACTIVE':
                     time.sleep(1)
-                    desc = connection.describe_table(self.ddb_tablename)
+                    desc = connection.describe_table(tablename)
 
-        return self.ddb_tablename
+        return tablename
 
     def delete_dynamo_schema(self, connection, tablenames=None, test=False,
-                             wait=False):
+                             wait=False, namespace=()):
         """
         Drop all Dynamo tables for this model
 
@@ -447,6 +459,8 @@ class ModelMetadata(object):
             If True, don't actually delete the table (default False)
         wait : bool, optional
             If True, block until table has been deleted (default False)
+        namespace : tuple, optional
+            The namespace of the table
 
         Returns
         -------
@@ -459,12 +473,13 @@ class ModelMetadata(object):
         if tablenames is None:
             tablenames = set(connection.list_tables())
 
-        if self.ddb_tablename in tablenames:
+        tablename = self.ddb_tablename(namespace)
+        if tablename in tablenames:
             if not test:
-                connection.delete_table(self.ddb_tablename)
+                connection.delete_table(tablename)
                 if wait:
-                    desc = connection.describe_table(self.ddb_tablename)
+                    desc = connection.describe_table(tablename)
                     while desc is not None:
-                        desc = connection.describe_table(self.ddb_tablename)
-            return self.ddb_tablename
+                        desc = connection.describe_table(tablename)
+            return tablename
         return None

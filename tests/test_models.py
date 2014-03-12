@@ -82,7 +82,8 @@ class TestComposite(DynamoSystemTest):
         """ Composite fields stored properly in dynamodb """
         w = Widget('a', 'b', 1)
         self.engine.save(w)
-        item = six.next(self.dynamo.scan(w.meta_.ddb_tablename))
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        item = six.next(self.dynamo.scan(tablename))
         self.assertEquals(item['c_range'], w.c_range)
         self.assertEquals(item['c_index'], w.c_index)
         self.assertEquals(item['c_plain'], w.c_plain)
@@ -102,7 +103,8 @@ class TestComposite(DynamoSystemTest):
         self.engine.save(w)
         w.text = 'foobar'
         w.sync()
-        results = self.dynamo.batch_get(w.meta_.ddb_tablename,
+        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        results = self.dynamo.batch_get(tablename,
                                         [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
         self.assertEquals(results[0]['text'], w.text)
@@ -120,7 +122,8 @@ class TestComposite(DynamoSystemTest):
         self.engine.save(w)
         w.likes += 2
         w.sync()
-        results = self.dynamo.batch_get(w.meta_.ddb_tablename,
+        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        results = self.dynamo.batch_get(tablename,
                                         [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
         self.assertEquals(results[0]['score'], 6)
@@ -165,7 +168,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Saving item puts it in the database """
         a = Article()
         self.engine.save(a)
-        result = six.next(self.dynamo.scan(a.meta_.ddb_tablename))
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a.title)
         self.assertIsNone(result.get('text'))
 
@@ -183,7 +187,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(text='obviously')
         self.engine.save(a2, overwrite=True)
-        result = six.next(self.dynamo.scan(a.meta_.ddb_tablename))
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(result['text'], a2.text)
 
@@ -193,7 +198,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(beta='ih')
         self.engine.save(a2, overwrite=True)
-        result = six.next(self.dynamo.scan(a.meta_.ddb_tablename))
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(json.loads(result['beta']), a2.beta)
         self.assertIsNone(result.get('alpha'))
@@ -293,7 +299,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync creates item even if only primary key is set """
         a = Article()
         self.engine.sync(a)
-        results = list(self.dynamo.scan(a.meta_.ddb_tablename))
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        results = list(self.dynamo.scan(tablename))
         self.assertEquals(len(results), 1)
         result = dict(results[0])
         self.assertEquals(result, {
@@ -481,7 +488,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync()
 
-        result = six.next(self.dynamo.scan(p.meta_.ddb_tablename))
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
@@ -493,7 +501,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync(raise_on_conflict=True)
 
-        result = six.next(self.dynamo.scan(p.meta_.ddb_tablename))
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
@@ -527,7 +536,8 @@ class TestModelMutation(DynamoSystemTest):
         p.foobar = None
         p.sync()
 
-        result = six.next(self.dynamo.scan(p.meta_.ddb_tablename))
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertFalse('foobar' in result)
 
     def test_add_to_set(self):
@@ -668,12 +678,12 @@ class TestCreate(DynamoSystemTest):
 
     def tearDown(self):
         super(TestCreate, self).tearDown()
-        Widget.meta_.namespace = ['test']
         Widget.meta_.delete_dynamo_schema(self.dynamo, wait=True)
 
     def _get_index(self, name):
         """ Get a specific index from the Store table """
-        desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)
+        tablename = Store.meta_.ddb_tablename(self.engine.namespace)
+        desc = self.dynamo.describe_table(tablename)
         for index in desc.indexes + desc.global_indexes:
             if index.name == name:
                 return index
@@ -712,7 +722,8 @@ class TestCreate(DynamoSystemTest):
     def test_model_throughput(self):
         """ Model defines the throughput """
         Widget.meta_.create_dynamo_schema(self.dynamo, wait=True)
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)
+        tablename = Widget.meta_.ddb_tablename()
+        desc = self.dynamo.describe_table(tablename)
         throughput = desc.throughput
         self.assertEquals(throughput.read, 1)
         self.assertEquals(throughput.write, 1)
@@ -731,7 +742,8 @@ class TestCreate(DynamoSystemTest):
                 'write': 3,
             },
         })
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)
+        tablename = Widget.meta_.ddb_tablename()
+        desc = self.dynamo.describe_table(tablename)
         throughput = desc.throughput
         self.assertEquals(throughput.read, 3)
         self.assertEquals(throughput.write, 3)
