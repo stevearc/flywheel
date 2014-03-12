@@ -24,7 +24,7 @@ project = u'flywheel'
 copyright = u'2013, Steven Arcangeli'
 github_user = u'mathcamp'
 
-release = '0.2.0rc1'
+release = '0.2.0rc2'
 version = '.'.join(release.split('.')[:2])
 
 exclude_patterns = ['_build']
