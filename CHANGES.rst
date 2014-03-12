@@ -4,6 +4,8 @@ Changelog
 -----
 * **Breakage**: Removing S3Type (no longer have boto as dependency)
 * Feature: Support Python 3.2 and 3.3
+* Feature: ``.count()`` terminator for queries (:sha:`bf3261c`)
+* Bug fix: Engine ``namespace`` is truly isolated (:sha:`3b4fad7`)
 
 0.1.3
 -----
