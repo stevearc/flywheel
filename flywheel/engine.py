@@ -1,14 +1,13 @@
 """ Query engine """
 import itertools
-from six.moves import zip as izip  # pylint: disable=F0401
-import six
-from dynamo3 import (DynamoDBConnection, CheckFailed, ItemUpdate, is_null,
-                     ALL_NEW)
-
 from collections import defaultdict
 
+import six
+from dynamo3 import DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW
+from six.moves import zip as izip  # pylint: disable=F0401
+
 from .fields import Field
-from .models import Model, ModelMetadata, SetDelta
+from .models import Model, SetDelta
 from .query import Query, Scan
 
 
@@ -74,6 +73,10 @@ class Engine(object):
     """
 
     def __init__(self, dynamo=None, namespace=(), default_conflict='update'):
+        if dynamo is not None and not isinstance(dynamo, DynamoDBConnection):
+            raise ValueError("'dynamo' needs to be an instance of "
+                             "dynamo3.DynamoDBConnection (are you using a "
+                             "boto connection?)")
         self.dynamo = dynamo
         self.models = {}
         self.namespace = namespace

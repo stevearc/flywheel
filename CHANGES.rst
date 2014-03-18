@@ -2,6 +2,7 @@ Changelog
 =========
 0.2.0
 -----
+* **Breakage**: Engine no longer accepts boto connections (using dynamo3 instead)
 * **Breakage**: Removing S3Type (no longer have boto as dependency)
 * Feature: Support Python 3.2 and 3.3
 * Feature: ``.count()`` terminator for queries (:sha:`bf3261c`)
