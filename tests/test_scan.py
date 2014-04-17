@@ -1,4 +1,5 @@
 """ Tests for table scans """
+import six
 from datetime import datetime, date, timedelta
 
 import inspect
@@ -37,6 +38,16 @@ class TestScan(DynamoSystemTest):
         self.assertEquals(len(results), 2)
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
+
+    def test_count(self):
+        """ Can return a count instead of the models """
+        u = User(id='a', name='Adam')
+        u2 = User(id='b', name='Billy')
+        self.engine.save([u, u2])
+        count = self.engine.scan(User).count()
+        self.assertEqual(count, 2)
+        count = self.engine.scan(User).filter(id='a').count()
+        self.assertEqual(count, 1)
 
     def test_iter(self):
         """ Scan can iterate over items """
@@ -287,11 +298,11 @@ class Widget(Model):
 
     """ Test model with every data type """
     id = Field(hash_key=True)
-    school = Field(data_type=unicode)
+    school = Field(data_type=six.text_type)
     count = Field(data_type=int)
     score = Field(data_type=float)
     isawesome = Field(data_type=bool)
-    name = Field(data_type=str)
+    name = Field(data_type=six.binary_type)
     friends = Field(data_type=set)
     dates = Field(data_type=frozenset([date]))
     data = Field(data_type=dict)

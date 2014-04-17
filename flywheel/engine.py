@@ -1,19 +1,14 @@
 """ Query engine """
 import itertools
-
-from boto.dynamodb2 import connect_to_region
-from boto.dynamodb2.exceptions import ConditionalCheckFailedException
-from boto.dynamodb2.items import Item
-from boto.dynamodb2.table import Table
-from boto.dynamodb2.types import Dynamizer
 from collections import defaultdict
 
+import six
+from dynamo3 import DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW
+from six.moves import zip as izip  # pylint: disable=F0401
+
 from .fields import Field
-from .models import Model, ModelMetadata, SetDelta
+from .models import Model, SetDelta
 from .query import Query, Scan
-
-
-DYNAMIZER = Dynamizer()
 
 
 class Engine(object):
@@ -23,9 +18,10 @@ class Engine(object):
 
     Parameters
     ----------
-    dynamo : :class:`boto.dynamodb2.DynamoDBConnection`, optional
-    namespace : list, optional
-        List of namespace component strings for models
+    dynamo : :class:`dynamodb3.DynamoDBConnection`, optional
+    namespace : list or str, optional
+        String prefix or list of component parts of a prefix for models. All
+        table names will be prefixed by this string or strings (joined by '-').
     default_conflict : {'update', 'overwrite', 'raise'}, optional
         Default setting for delete(), save(), and sync() (default 'update')
 
@@ -76,11 +72,15 @@ class Engine(object):
 
     """
 
-    def __init__(self, dynamo=None, namespace=None, default_conflict='update'):
+    def __init__(self, dynamo=None, namespace=(), default_conflict='update'):
+        if dynamo is not None and not isinstance(dynamo, DynamoDBConnection):
+            raise ValueError("'dynamo' needs to be an instance of "
+                             "dynamo3.DynamoDBConnection (are you using a "
+                             "boto connection?)")
         self.dynamo = dynamo
         self.models = {}
-        self.namespace = namespace or []
-        ModelMetadata.namespace = self.namespace
+        self.namespace = namespace
+        self._default_conflict = None
         self.default_conflict = default_conflict
 
     @property
@@ -136,7 +136,11 @@ class Engine(object):
 
     def connect_to_region(self, region, **kwargs):
         """ Connect to an AWS region """
-        self.dynamo = connect_to_region(region, **kwargs)
+        self.dynamo = DynamoDBConnection.connect_to_region(region, **kwargs)
+
+    def connect_to_host(self, **kwargs):
+        """ Connect to a specific host """
+        self.dynamo = DynamoDBConnection.connect_to_host(**kwargs)
 
     def register(self, *models):
         """
@@ -151,32 +155,85 @@ class Engine(object):
                                  model.meta_.name)
             self.models[model.meta_.name] = model
 
-    def create_schema(self, test=False):
-        """ Create the DynamoDB tables required by the registered models """
-        tablenames = self.dynamo.list_tables()['TableNames']
+    def create_schema(self, test=False, throughput=None):
+        """
+        Create the DynamoDB tables required by the registered models
+
+        Parameters
+        ----------
+        test : bool, optional
+            If True, perform a dry run (default False)
+        throughput : dict, optional
+            If provided, override the throughputs of the Models when creating
+            them. Details below.
+
+        Returns
+        -------
+        names : list
+            List of table names that were created
+
+        Examples
+        --------
+        The ``throughput`` argument is a mapping of table names to their
+        throughputs. The throughput is a dict with a 'read' and 'write' value.
+        It may also include the names of global indexes that map to their own
+        dicts with a 'read' and 'write' value.
+
+        .. code-block:: python
+
+            engine.create_schema(throughput={
+                'table1': {
+                    'read': 4,
+                    'write': 10,
+                    'gindex-1': {
+                        'read': 6,
+                        'write': 3,
+                    }
+                }
+            })
+
+        """
+        throughput = throughput or {}
+        tablenames = set(self.dynamo.list_tables())
         changed = []
-        for model in self.models.itervalues():
-            result = model.meta_.create_dynamo_schema(self.dynamo, tablenames,
-                                                      test=test, wait=True)
+        for model in six.itervalues(self.models):
+            result = model.meta_.create_dynamo_schema(
+                self.dynamo, tablenames, test=test, wait=True,
+                throughput=throughput.get(model.meta_.ddb_tablename()),
+                namespace=self.namespace)
             if result:
                 changed.append(result)
         return changed
 
     def delete_schema(self, test=False):
-        """ Drop the DynamoDB tables for all registered models """
-        tablenames = set(self.dynamo.list_tables()['TableNames'])
+        """
+        Drop the DynamoDB tables for all registered models
+
+        Parameters
+        ----------
+        test : bool, optional
+            If True, perform a dry run (default False)
+
+        Returns
+        -------
+        names : list
+            List of table names that were deleted
+
+        """
+        tablenames = set(self.dynamo.list_tables())
         changed = []
-        for model in self.models.itervalues():
+        for model in six.itervalues(self.models):
             result = model.meta_.delete_dynamo_schema(self.dynamo, tablenames,
-                                                      test=test, wait=True)
+                                                      test=test, wait=True,
+                                                      namespace=self.namespace)
             changed.append(result)
         return changed
 
     def get_schema(self):
         """ Get the schema for the registered models """
         schema = []
-        for model in self.models.itervalues():
-            schema.append(model.meta_.ddb_tablename)
+        for model in six.itervalues(self.models):
+            schema.append(model.meta_.ddb_tablename(self.namespace))
         return schema
 
     def __call__(self, model):
@@ -246,8 +303,9 @@ class Engine(object):
         else:
             keys = [model.meta_.pk_dict(scope=kwargs)]
 
-        table = model.meta_.ddb_table(self.dynamo)
-        raw_items = table.batch_get(keys=keys, consistent=consistent)
+        raw_items = self.dynamo.batch_get(
+            model.meta_.ddb_tablename(self.namespace), keys,
+            consistent=consistent)
         items = [model.ddb_load_(self, raw_item) for raw_item in raw_items]
         if pkeys is not None:
             return items
@@ -292,11 +350,11 @@ class Engine(object):
             keys = [kwargs]
 
         count = 0
-        table = Table(model.meta_.ddb_tablename, connection=self.dynamo)
-        with table.batch_write() as batch:
+        tablename = model.meta_.ddb_tablename(self.namespace)
+        with self.dynamo.batch_write(tablename) as batch:
             for key in keys:
                 pkey = model.meta_.pk_dict(scope=key)
-                batch.delete_item(**pkey)
+                batch.delete(pkey)
                 count += 1
         return count
 
@@ -317,7 +375,7 @@ class Engine(object):
 
         Raises
         ------
-        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`dynamo3.ConditionalCheckFailedException`
             If overwrite is False and an item already exists in the database
 
         Notes
@@ -335,10 +393,10 @@ class Engine(object):
             return
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename].append(item)
+            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
 
         count = 0
-        for tablename, items in tables.iteritems():
+        for tablename, items in six.iteritems(tables):
             if raise_on_conflict:
                 for item in items:
                     expected = item.construct_ddb_expects_()
@@ -346,15 +404,14 @@ class Engine(object):
                     self.dynamo.delete_item(tablename, item.pk_dict_,
                                             expected=expected)
             else:
-                table = Table(tablename, connection=self.dynamo)
-                with table.batch_write() as batch:
+                with self.dynamo.batch_write(tablename) as batch:
                     for item in items:
                         if isinstance(item, Model):
                             keys = item.pk_dict_
                         else:
-                            keys = dict(item)
+                            keys = item
                         count += 1
-                        batch.delete_item(**keys)
+                        batch.delete(keys)
         return count
 
     def save(self, items, overwrite=None):
@@ -370,7 +427,7 @@ class Engine(object):
 
         Raises
         ------
-        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`dynamo3.ConditionalCheckFailedException`
             If overwrite is False and an item already exists in the database
 
         Notes
@@ -391,25 +448,19 @@ class Engine(object):
             return
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename].append(item)
-        for tablename, items in tables.iteritems():
-            table = Table(tablename, connection=self.dynamo)
+            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
+        for tablename, items in six.iteritems(tables):
             if overwrite:
-                with table.batch_write() as batch:
+                with self.dynamo.batch_write(tablename) as batch:
                     for item in items:
                         item.pre_save_(self)
-                        batch.put_item(data=item.ddb_dump_())
+                        batch.put(item.ddb_dump_())
                         item.post_save_()
             else:
                 for item in items:
-                    expected = {}
-                    for name in item.meta_.fields:
-                        expected[name] = {
-                            'Exists': False,
-                        }
+                    expected = dict(((k, None) for k in item.pk_dict_))
                     item.pre_save_(self)
-                    boto_item = Item(table, data=item.ddb_dump_())
-                    self.dynamo.put_item(tablename, boto_item.prepare_full(),
+                    self.dynamo.put_item(tablename, item.ddb_dump_(),
                                          expected=expected)
                     item.post_save_()
 
@@ -432,13 +483,13 @@ class Engine(object):
 
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename].append(item)
+            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
 
-        for tablename, items in tables.iteritems():
-            table = Table(tablename, connection=self.dynamo)
+        for tablename, items in six.iteritems(tables):
             keys = [item.pk_dict_ for item in items]
-            results = table.batch_get(keys, consistent=consistent)
-            for item, data in itertools.izip(items, results):
+            results = self.dynamo.batch_get(tablename, keys,
+                                            consistent=consistent)
+            for item, data in izip(items, results):
                 with item.loading_(self):
                     for key, val in data.items():
                         item.set_ddb_val_(key, val)
@@ -464,7 +515,7 @@ class Engine(object):
 
         Raises
         ------
-        exc : :class:`boto.dynamodb2.exceptions.ConditionalCheckFailedException`
+        exc : :class:`dynamo3.CheckFailed`
             If raise_on_conflict=True and the model changed underneath us
 
         """
@@ -502,58 +553,39 @@ class Engine(object):
                 for related_name in item.meta_.related_fields.get(name, []):
                     field = item.meta_.fields[related_name]
                     if field.composite:
-                        __raise_on_conflict = True
+                        _raise_on_conflict = True
                         break
 
-            if _raise_on_conflict:
-                expected = item.construct_ddb_expects_(fields)
-            else:
-                expected = None
-
+            updates = []
             # Set dynamo keys
-            data = {}
             for name in fields:
                 field = item.meta_.fields.get(name)
                 value = getattr(item, name)
-                # Empty sets can't be stored, so delete the value instead
-                if value is None or value == set():
-                    action = 'DELETE'
-                else:
-                    action = 'PUT'
-                data[name] = {'Action': action}
-                if action != 'DELETE':
-                    data[name]['Value'] = DYNAMIZER.encode(
-                        item.ddb_dump_field_(name))
+                kwargs = {}
+                if _raise_on_conflict:
+                    kwargs['expected'] = item.ddb_dump_cached_(name)
+                update = ItemUpdate.put(name, item.ddb_dump_field_(name),
+                                        **kwargs)
+                updates.append(update)
 
             # Atomic increment fields
-            for name, value in item.__incrs__.iteritems():
+            for name, value in six.iteritems(item.__incrs__):
+                kwargs = {}
                 # We don't need to ddb_dump because we know they're all native
                 if isinstance(value, SetDelta):
-                    data[name] = {
-                        'Action': value.action,
-                        'Value': DYNAMIZER.encode(value.values),
-                    }
+                    update = ItemUpdate(value.action, name, value.values)
                 else:
-                    data[name] = {
-                        'Action': 'ADD',
-                        'Value': DYNAMIZER.encode(value),
-                    }
-
-            key = dict([(k, DYNAMIZER.encode(v)) for k, v in
-                        item.pk_dict_.iteritems()])
+                    update = ItemUpdate.add(name, value)
+                updates.append(update)
 
             # Perform sync
-            ret = self.dynamo.update_item(item.meta_.ddb_tablename, key, data,
-                                          expected=expected,
-                                          return_values='ALL_NEW')
+            ret = self.dynamo.update_item(
+                item.meta_.ddb_tablename(self.namespace), item.pk_dict_,
+                updates, returns=ALL_NEW)
 
             # Load updated data back into object
-            table = item.meta_.ddb_table(self.dynamo)
-            data = dict([(k, DYNAMIZER.decode(v)) for k, v in
-                        ret.get('Attributes', {}).iteritems()])
-            ret = Item(table, data=data)
             with item.loading_(self):
-                for key, val in dict(ret).iteritems():
+                for key, val in six.iteritems(ret):
                     item.set_ddb_val_(key, val)
 
             item.post_save_()
@@ -565,7 +597,7 @@ class Engine(object):
             if not item.persisted_:
                 try:
                     self.save(item, overwrite=False)
-                except ConditionalCheckFailedException:
+                except CheckFailed:
                     pass
         # Refresh item data
         self.refresh(refresh_models, consistent=consistent)

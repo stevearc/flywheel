@@ -24,7 +24,7 @@ project = u'flywheel'
 copyright = u'2013, Steven Arcangeli'
 github_user = u'mathcamp'
 
-release = '0.1.3'
+release = '0.2.0'
 version = '.'.join(release.split('.')[:2])
 
 exclude_patterns = ['_build']
@@ -34,7 +34,6 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 numpydoc_show_class_members = False
 intersphinx_mapping = {
     'python': ('http://docs.python.org/', None),
-    'boto': ('http://boto.readthedocs.org/en/latest/', None),
 }
 
 

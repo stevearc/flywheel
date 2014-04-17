@@ -14,14 +14,13 @@ CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
 REQUIREMENTS = [
-    'boto>=2.23.0',
+    'dynamo3',
+    'six'
 ]
 
 TEST_REQUIREMENTS = [
     'nose',
     'mock',
-    'httpretty',
-    'moto',
 ]
 
 if sys.version_info[:2] < (2, 7):
@@ -30,7 +29,7 @@ if sys.version_info[:2] < (2, 7):
 if __name__ == "__main__":
     setup(
         name='flywheel',
-        version='0.1.3',
+        version='0.2.0',
         description="SQLAlchemy-style ORM for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
@@ -42,6 +41,9 @@ if __name__ == "__main__":
             'Programming Language :: Python :: 2',
             'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.2',
+            'Programming Language :: Python :: 3.3',
             'Topic :: Database',
         ],
         author='Steven Arcangeli',
@@ -52,11 +54,6 @@ if __name__ == "__main__":
         platforms='any',
         include_package_data=True,
         packages=find_packages(exclude=('tests',)),
-        entry_points={
-            'nose.plugins': [
-                'dynamolocal=flywheel.tests:DynamoLocalPlugin',
-            ],
-        },
         install_requires=REQUIREMENTS,
         tests_require=REQUIREMENTS + TEST_REQUIREMENTS,
     )

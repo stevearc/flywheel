@@ -30,33 +30,31 @@ special notes. For more information, the code for data types is located in
 :mod:`~flywheel.fields.types`.
 
 
-+----------+-------------+---------------------------------------------------------------+
-| Type     | Dynamo Type | Description                                                   |
-+==========+=============+===============================================================+
-| unicode  | STRING      | Basic STRING type. This is the default for fields             |
-+----------+-------------+---------------------------------------------------------------+
-| str      | BINARY      |                                                               |
-+----------+-------------+---------------------------------------------------------------+
-| int      | NUMBER      | Enforces integer constraint on data                           |
-+----------+-------------+---------------------------------------------------------------+
-| float    | NUMBER      |                                                               |
-+----------+-------------+---------------------------------------------------------------+
-| set      | \*_SET      | This will use the appropriate type of DynamoDB set            |
-+----------+-------------+---------------------------------------------------------------+
-| bool     | NUMBER      |                                                               |
-+----------+-------------+---------------------------------------------------------------+
-| datetime | NUMBER      | datetimes MUST be provided in UTC                             |
-+----------+-------------+---------------------------------------------------------------+
-| date     | NUMBER      | dates MUST be provided in UTC                                 |
-+----------+-------------+---------------------------------------------------------------+
-| Decimal  | NUMBER      | If you need decimal precision in your application             |
-+----------+-------------+---------------------------------------------------------------+
-| dict     | STRING      | Stored as json-encoded string                                 |
-+----------+-------------+---------------------------------------------------------------+
-| list     | STRING      | Stored as json-encoded string                                 |
-+----------+-------------+---------------------------------------------------------------+
-| S3Type   | STRING      | Stores the S3 key path as a string                            |
-+----------+-------------+---------------------------------------------------------------+
++----------+----------+-------------+---------------------------------------------------------------+
+| PY2 Type | PY3 Type | Dynamo Type | Description                                                   |
++==========+==========+=============+===============================================================+
+| unicode  | str      | STRING      | Basic STRING type. This is the default for fields             |
++----------+----------+-------------+---------------------------------------------------------------+
+| str      | bytes    | BINARY      | Binary data, (serialized objects, compressed data, etc)       |
++----------+----------+-------------+---------------------------------------------------------------+
+| int/long | int      | NUMBER      | Enforces integer constraint on data                           |
++----------+----------+-------------+---------------------------------------------------------------+
+| float    |          | NUMBER      |                                                               |
++----------+----------+-------------+---------------------------------------------------------------+
+| set      |          | \*_SET      | This will use the appropriate type of DynamoDB set            |
++----------+----------+-------------+---------------------------------------------------------------+
+| bool     |          | NUMBER      |                                                               |
++----------+----------+-------------+---------------------------------------------------------------+
+| datetime |          | NUMBER      | datetimes will be treated as naïve. UTC recommended.          |
++----------+----------+-------------+---------------------------------------------------------------+
+| date     |          | NUMBER      | dates will be treated as naïve. UTC recommended.              |
++----------+----------+-------------+---------------------------------------------------------------+
+| Decimal  |          | NUMBER      |                                                               |
++----------+----------+-------------+---------------------------------------------------------------+
+| dict     |          | STRING      | Stored as json-encoded string                                 |
++----------+----------+-------------+---------------------------------------------------------------+
+| list     |          | STRING      | Stored as json-encoded string                                 |
++----------+----------+-------------+---------------------------------------------------------------+
 
 If you attempt to set a field with a type that doesn't match, it will raise a
 ``TypeError``.  If a field was created with ``coerce=True`` it will first
@@ -66,10 +64,10 @@ you.
 
 .. note::
 
-    Certain fields will auto-coerce specific data types. For example, a ``str``
-    field will auto-encode a ``unicode`` to utf-8 even if ``coerce=False``.
-    Similarly, a ``unicode`` field will auto-decode a ``str`` value to a
-    unicode string.
+    Certain fields will auto-coerce specific data types. For example, a
+    ``bytes`` field will auto-encode a ``unicode`` to utf-8 even if
+    ``coerce=False``.  Similarly, a ``unicode`` field will auto-decode a
+    ``bytes`` value to a unicode string.
 
 .. warning::
 
@@ -112,43 +110,6 @@ the python ``frozenset`` builtin:
 
     events = Field(data_type=frozenset([date]))
 
-Advanced Types
---------------
-
-S3 Keys
-^^^^^^^
-You can use :class:`~flywheel.fields.types.S3Type` to quickly and easily
-reference S3 values from your model objects. This type will store the S3 key in
-Dynamo and put a :class:`~boto.s3.key.Key` object in your model.
-
-.. code-block:: python
-
-    from flywheel.fields.types import S3Type
-
-    class Image(Model):
-        user = Field(hash_key=True)
-        name = Field(range_key=True)
-        taken = Field(data_type=datetime, index='taken-index')
-        data = Composite('user', 'name', data_type=S3Type('my_image_bucket'),
-                         merge=lambda *a: '/'.join(a))
-
-        def __init__(self, user, name, taken):
-            self.user = user
-            self.name = name
-            self.taken = taken
-
-You can use this class like so:
-
-.. code-block:: python
-
-    >>> img = Image('Rob', 'Big Sur.jpg', datetime.utcnow())
-    >>> img.data.set_contents_from_filename(img.name)
-    >>> engine.save(img)
-
-It will store the image data in the S3 bucket named ``my_image_bucket`` and use
-the path ``Rob/Big Sur.jpg``. See :ref:`composite_fields` for more about how
-the key path is generated.
-
 .. _custom_data_type:
 
 Custom Types
@@ -174,7 +135,7 @@ store any python object in pickled format.
             return value
 
         def ddb_dump(self, value):
-            # Pickle and convert to a Binary object for boto
+            # Pickle and convert to a Binary object
             return Binary(pickle.dumps(value))
 
         def ddb_load(self, value):

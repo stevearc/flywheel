@@ -37,6 +37,7 @@ nosetests.xml
 flywheel_env
 .ropeproject
 _localhost.db
+_local.db
 
 # docs
 _build

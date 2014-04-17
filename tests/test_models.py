@@ -1,7 +1,9 @@
 """ Tests for models """
+import six
 import json
 from decimal import Decimal
 from mock import patch, ANY
+from dynamo3 import ItemUpdate
 
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
@@ -80,8 +82,8 @@ class TestComposite(DynamoSystemTest):
         """ Composite fields stored properly in dynamodb """
         w = Widget('a', 'b', 1)
         self.engine.save(w)
-        table = w.meta_.ddb_table(self.dynamo)
-        item = list(table.scan())[0]
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        item = six.next(self.dynamo.scan(tablename))
         self.assertEquals(item['c_range'], w.c_range)
         self.assertEquals(item['c_index'], w.c_index)
         self.assertEquals(item['c_plain'], w.c_plain)
@@ -96,13 +98,14 @@ class TestComposite(DynamoSystemTest):
             w.id = 'other'
 
     def test_update_composite_fields(self):
-        """ When updating a field, all relevant composite fields are updated """
+        """ When updating a field all relevant composite fields are updated """
         w = Post('a', 'b', 1)
         self.engine.save(w)
         w.text = 'foobar'
         w.sync()
-        table = w.meta_.ddb_table(self.dynamo)
-        results = table.batch_get(keys=[{w.meta_.hash_key.name: w.hk_}])
+        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        results = self.dynamo.batch_get(tablename,
+                                        [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
         self.assertEquals(results[0]['text'], w.text)
         self.assertEquals(results[0]['c_all'], w.c_all)
@@ -119,8 +122,9 @@ class TestComposite(DynamoSystemTest):
         self.engine.save(w)
         w.likes += 2
         w.sync()
-        table = w.meta_.ddb_table(self.dynamo)
-        results = table.batch_get(keys=[{w.meta_.hash_key.name: w.hk_}])
+        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        results = self.dynamo.batch_get(tablename,
+                                        [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
         self.assertEquals(results[0]['score'], 6)
 
@@ -130,9 +134,6 @@ class TestComposite(DynamoSystemTest):
         self.engine.sync(p)
         self.assertEquals(p.score, 2)
         p.deleted = True
-
-        table = p.meta_.ddb_table(self.dynamo)
-        r = dict(list(table.scan())[0])
 
         p.sync()
         self.assertIsNone(p.score)
@@ -167,8 +168,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Saving item puts it in the database """
         a = Article()
         self.engine.save(a)
-        table = a.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a.title)
         self.assertIsNone(result.get('text'))
 
@@ -186,8 +187,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(text='obviously')
         self.engine.save(a2, overwrite=True)
-        table = a.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(result['text'], a2.text)
 
@@ -197,8 +198,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(beta='ih')
         self.engine.save(a2, overwrite=True)
-        table = a.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(json.loads(result['beta']), a2.beta)
         self.assertIsNone(result.get('alpha'))
@@ -241,18 +242,22 @@ class TestModelMutation(DynamoSystemTest):
     def test_sync_only_updates_changed(self):
         """ Sync only updates fields that have been changed """
         with patch.object(self.engine, 'dynamo') as dynamo:
+            captured_updates = []
+
+            def update_item(_, __, updates, *___, **____):
+                """ Mock update_item and capture the passed updateds """
+                captured_updates.extend(updates)
+                return {}
+            dynamo.update_item.side_effect = update_item
+
             p = Post('a', 'b', 4)
             self.engine.save(p)
             p.foobar = set('a')
             p.points = Decimal('2')
             p.sync(raise_on_conflict=False)
-            data = {
-                'foobar': ANY,
-                'points': ANY,
-            }
-            dynamo.update_item.assert_called_with(ANY, ANY, data,
-                                                  expected=None,
-                                                  return_values=ANY)
+            self.assertEqual(len(captured_updates), 2)
+            self.assertTrue(ItemUpdate.put('foobar', ANY) in captured_updates)
+            self.assertTrue(ItemUpdate.put('points', ANY) in captured_updates)
 
     def test_delete(self):
         """ Model can delete itself """
@@ -294,8 +299,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync creates item even if only primary key is set """
         a = Article()
         self.engine.sync(a)
-        table = a.meta_.ddb_table(self.dynamo)
-        results = list(table.scan())
+        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        results = list(self.dynamo.scan(tablename))
         self.assertEquals(len(results), 1)
         result = dict(results[0])
         self.assertEquals(result, {
@@ -483,8 +488,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync()
 
-        table = p.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
@@ -496,8 +501,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync(raise_on_conflict=True)
 
-        table = p.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
         self.assertEquals(result['score'], 4)
@@ -531,8 +536,8 @@ class TestModelMutation(DynamoSystemTest):
         p.foobar = None
         p.sync()
 
-        table = p.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertFalse('foobar' in result)
 
     def test_add_to_set(self):
@@ -673,69 +678,59 @@ class TestCreate(DynamoSystemTest):
 
     def tearDown(self):
         super(TestCreate, self).tearDown()
-        Widget.meta_.namespace = ['test']
         Widget.meta_.delete_dynamo_schema(self.dynamo, wait=True)
 
     def _get_index(self, name):
         """ Get a specific index from the Store table """
-        desc = self.dynamo.describe_table(Store.meta_.ddb_tablename)['Table']
-        for key in ('LocalSecondaryIndexes', 'GlobalSecondaryIndexes'):
-            indexes = desc[key]
-            for index in indexes:
-                if index['IndexName'] == name:
-                    return index
+        tablename = Store.meta_.ddb_tablename(self.engine.namespace)
+        desc = self.dynamo.describe_table(tablename)
+        for index in desc.indexes + desc.global_indexes:
+            if index.name == name:
+                return index
 
     def test_create_local_all_index(self):
         """ Create a local secondary ALL index """
         index = self._get_index('size-index')
-        projection = index['Projection']
-        self.assertEquals(projection['ProjectionType'], 'ALL')
+        self.assertEquals(index.projection_type, 'ALL')
 
     def test_create_local_keys_index(self):
         """ Create a local secondary KEYS index """
         index = self._get_index('emp-index')
-        projection = index['Projection']
-        self.assertEquals(projection['ProjectionType'], 'KEYS_ONLY')
+        self.assertEquals(index.projection_type, 'KEYS_ONLY')
 
     def test_create_local_include_index(self):
         """ Create a local secondary INCLUDE index """
         index = self._get_index('profit-index')
-        projection = index['Projection']
-        self.assertEquals(projection['ProjectionType'], 'INCLUDE')
-        self.assertEquals(projection['NonKeyAttributes'],
-                          ['name', 'num_employees'])
+        self.assertEquals(index.projection_type, 'INCLUDE')
+        self.assertEquals(index.include_fields, ['name', 'num_employees'])
 
     def test_create_global_all_index(self):
         """ Create a global secondary ALL index """
         index = self._get_index('name-index')
-        projection = index['Projection']
-        self.assertEquals(projection['ProjectionType'], 'ALL')
+        self.assertEquals(index.projection_type, 'ALL')
 
     def test_create_global_keys_index(self):
         """ Create a global secondary KEYS index """
         index = self._get_index('name-emp-index')
-        projection = index['Projection']
-        self.assertEquals(projection['ProjectionType'], 'KEYS_ONLY')
+        self.assertEquals(index.projection_type, 'KEYS_ONLY')
 
     def test_create_global_include_index(self):
         """ Create a global secondary INCLUDE index """
         index = self._get_index('name-profit-index')
-        projection = index['Projection']
-        self.assertEquals(projection['NonKeyAttributes'],
-                          ['name', 'num_employees'])
+        self.assertEquals(index.include_fields, ['name', 'num_employees'])
 
     def test_model_throughput(self):
         """ Model defines the throughput """
         Widget.meta_.create_dynamo_schema(self.dynamo, wait=True)
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)['Table']
-        throughput = desc['ProvisionedThroughput']
-        self.assertEquals(throughput['ReadCapacityUnits'], 1)
-        self.assertEquals(throughput['WriteCapacityUnits'], 1)
-        global_indexes = desc['GlobalSecondaryIndexes']
-        for index in global_indexes:
-            throughput = index['ProvisionedThroughput']
-            self.assertEquals(throughput['ReadCapacityUnits'], 1)
-            self.assertEquals(throughput['WriteCapacityUnits'], 1)
+        tablename = Widget.meta_.ddb_tablename()
+        desc = self.dynamo.describe_table(tablename)
+        throughput = desc.throughput
+        self.assertEquals(throughput.read, 1)
+        self.assertEquals(throughput.write, 1)
+        for index in desc.global_indexes:
+            throughput = index.throughput
+            self.assertEquals(throughput.read, 1)
+            self.assertEquals(throughput.write, 1)
 
     def test_override_throughput(self):
         """ Throughput can be overridden in the create call """
@@ -747,15 +742,15 @@ class TestCreate(DynamoSystemTest):
                 'write': 3,
             },
         })
-        desc = self.dynamo.describe_table(Widget.meta_.ddb_tablename)['Table']
-        throughput = desc['ProvisionedThroughput']
-        self.assertEquals(throughput['ReadCapacityUnits'], 3)
-        self.assertEquals(throughput['WriteCapacityUnits'], 3)
-        global_indexes = desc['GlobalSecondaryIndexes']
-        for index in global_indexes:
-            throughput = index['ProvisionedThroughput']
-            self.assertEquals(throughput['ReadCapacityUnits'], 3)
-            self.assertEquals(throughput['WriteCapacityUnits'], 3)
+        tablename = Widget.meta_.ddb_tablename()
+        desc = self.dynamo.describe_table(tablename)
+        throughput = desc.throughput
+        self.assertEquals(throughput.read, 3)
+        self.assertEquals(throughput.write, 3)
+        for index in desc.global_indexes:
+            throughput = index.throughput
+            self.assertEquals(throughput.read, 3)
+            self.assertEquals(throughput.write, 3)
 
 
 class TestModelMethods(unittest.TestCase):

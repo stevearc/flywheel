@@ -1,13 +1,12 @@
 """ Tests for fields """
+import six
 import zlib
 from datetime import datetime, date
 
 import json
 from decimal import Decimal
-from flywheel.fields.types import DictType, S3Type, Key, register_type
-from moto import mock_s3
+from flywheel.fields.types import DictType, register_type
 
-import boto
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex, set_)
 from flywheel.tests import DynamoSystemTest
@@ -28,10 +27,16 @@ class CompressedDict(DictType):
     ddb_data_type = BINARY
 
     def ddb_dump(self, value):
-        return Binary(zlib.compress(json.dumps(value)))
+        dumped = json.dumps(value)
+        if isinstance(dumped, six.text_type):
+            dumped = dumped.encode('ascii')
+        return Binary(zlib.compress(dumped))
 
     def ddb_load(self, value):
-        return json.loads(zlib.decompress(value.value))
+        decompressed = zlib.decompress(value.value)
+        if isinstance(decompressed, six.binary_type):
+            decompressed = decompressed.decode('ascii')
+        return json.loads(decompressed)
 
 
 register_type(CompressedDict)
@@ -56,8 +61,6 @@ class Widget(Model):
     data_list = Field(data_type=list)
     bigdata = Field(data_type=CompressedDict)
     natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
-    s3data = Composite('string', 'string2', data_type=S3Type('mybucket'),
-                       merge=lambda *a: '/'.join([x or '' for x in a]))
 
     def __init__(self, **kwargs):
         kwargs.setdefault('string', 'abc')
@@ -76,7 +79,7 @@ class TestCreateFields(unittest.TestCase):
     def test_unknown_data_type(self):
         """ Unknown data types are disallowed by Field """
         with self.assertRaises(TypeError):
-            Field(data_type=basestring)
+            Field(data_type='flkask')
 
     def test_double_index(self):
         """ Field cannot be indexed twice """
@@ -105,38 +108,38 @@ class TestFieldCoerce(unittest.TestCase):
     """ Tests Field type coercion """
 
     def test_always_coerce_str_unicode(self):
-        """ Always coerce str to unicode """
-        field = Field(data_type=unicode)
+        """ Always coerce bytes to unicode """
+        field = Field(data_type=six.text_type)
         ret = field.coerce(b'val')
-        self.assertTrue(isinstance(ret, unicode))
+        self.assertTrue(isinstance(ret, six.text_type))
 
     def test_coerce_unicode(self):
         """ Coerce to unicode """
-        field = Field(data_type=unicode, coerce=True)
+        field = Field(data_type=six.text_type, coerce=True)
         ret = field.coerce(5)
-        self.assertTrue(isinstance(ret, unicode))
+        self.assertTrue(isinstance(ret, six.text_type))
 
     def test_coerce_unicode_fail(self):
         """ Coerce to unicode fails if coerce=False """
-        field = Field(data_type=unicode)
+        field = Field(data_type=six.text_type)
         with self.assertRaises(TypeError):
             field.coerce(5)
 
     def test_always_coerce_unicode_str(self):
-        """ Always coerce unicode to str """
-        field = Field(data_type=str)
-        ret = field.coerce(u'val')
-        self.assertTrue(isinstance(ret, str))
+        """ Always coerce unicode to bytes """
+        field = Field(data_type=six.binary_type)
+        ret = field.coerce(six.u('val'))
+        self.assertTrue(isinstance(ret, six.binary_type))
 
     def test_coerce_str(self):
-        """ Coerce to str """
-        field = Field(data_type=str, coerce=True)
+        """ Coerce to bytes """
+        field = Field(data_type=six.binary_type, coerce=True)
         ret = field.coerce(5)
-        self.assertTrue(isinstance(ret, str))
+        self.assertTrue(isinstance(ret, six.binary_type))
 
     def test_coerce_str_fail(self):
-        """ Coerce to str fails if coerce=False """
-        field = Field(data_type=str)
+        """ Coerce to bytes fails if coerce=False """
+        field = Field(data_type=six.binary_type)
         with self.assertRaises(TypeError):
             field.coerce(5)
 
@@ -258,24 +261,6 @@ class TestFieldCoerce(unittest.TestCase):
         with self.assertRaises(TypeError):
             field.coerce(12345)
 
-    @mock_s3
-    def test_coerce_s3key(self):
-        """ Coerce string to S3 key """
-        field = Field(data_type=S3Type('mybucket'))
-        ret = field.coerce('my/path')
-        self.assertTrue(isinstance(ret, Key))
-        self.assertEqual(ret.key, 'my/path')
-
-    @mock_s3
-    def test_coerce_boto_s3key(self):
-        """ Coerce boto key to S3 key """
-        field = Field(data_type=S3Type('mybucket'))
-        boto_key = boto.s3.key.Key()
-        boto_key.key = 'my/path'
-        ret = field.coerce(boto_key)
-        self.assertTrue(isinstance(ret, Key))
-        self.assertEqual(ret.key, 'my/path')
-
     def test_coerce_basic_set(self):
         """ Coerce to an untyped set """
         field = Field(data_type=set, coerce=True)
@@ -302,8 +287,8 @@ class TestFieldCoerce(unittest.TestCase):
 
     def test_coerce_binary_set(self):
         """ Coerce to binary set """
-        field = Field(data_type=set_(str), coerce=True)
-        ret = field.coerce([u'hello'])
+        field = Field(data_type=set_(six.binary_type), coerce=True)
+        ret = field.coerce([six.u('hello')])
         self.assertEqual(ret, set([b'hello']))
 
     def test_set_defn_with_frozenset(self):
@@ -345,13 +330,12 @@ class TestFields(DynamoSystemTest):
         """ Default field values are saved to dynamo """
         w = Widget(string2='abc')
         self.engine.sync(w)
-        table = w.meta_.ddb_table(self.dynamo)
-        result = dict(list(table.scan())[0])
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result, {
             'string': w.string,
             'string2': w.string2,
             'natural_num': 1,
-            's3data': w.string + '/' + w.string2,
         })
 
     def test_set_updates(self):
@@ -389,8 +373,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=5)
         self.engine.sync(w)
 
-        table = Widget.meta_.ddb_table(self.dynamo)
-        result = list(table.scan())[0]
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], 5)
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(stored_widget.foobar, 5)
@@ -400,8 +384,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar='hi')
         self.engine.sync(w)
 
-        table = Widget.meta_.ddb_table(self.dynamo)
-        result = list(table.scan())[0]
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], json.dumps('hi'))
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(stored_widget.foobar, 'hi')
@@ -412,8 +396,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=foobar)
         self.engine.sync(w)
 
-        table = Widget.meta_.ddb_table(self.dynamo)
-        result = list(table.scan())[0]
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], foobar)
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(stored_widget.foobar, foobar)
@@ -424,8 +408,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=foobar)
         self.engine.save(w)
 
-        table = Widget.meta_.ddb_table(self.dynamo)
-        result = list(table.scan())[0]
+        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], json.dumps(foobar))
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(stored_widget.foobar, foobar)
@@ -521,19 +505,6 @@ class TestFields(DynamoSystemTest):
         stored_widget = self.engine.scan(Widget).first()
         self.assertEqual(stored_widget.bigdata, {'a': 1})
 
-    @mock_s3
-    def test_s3_data(self):
-        """ Can save and retrieve S3 data """
-        conn = boto.connect_s3()
-        conn.create_bucket('mybucket')
-        w = Widget(string='a', string2='b')
-        w.s3data.set_contents_from_string('data')
-        self.engine.save(w)
-        stored_widget = self.engine.scan(Widget).first()
-        self.assertEqual(stored_widget.s3data.key, 'a/b')
-        data = stored_widget.s3data.get_contents_as_string()
-        self.assertEqual(data, 'data')
-
 
 class PrimitiveWidget(Model):
 
@@ -544,8 +515,8 @@ class PrimitiveWidget(Model):
             GlobalIndex('gindex2', 'num2', 'binary'),
         ],
     }
-    string = Field(data_type=str, hash_key=True)
-    string2 = Field(data_type=unicode)
+    string = Field(data_type=six.binary_type, hash_key=True)
+    string2 = Field(data_type=six.text_type)
     num = Field(data_type=int, coerce=True)
     num2 = Field(data_type=float)
     binary = Field(data_type=BINARY, coerce=True)

@@ -47,7 +47,7 @@ type. The results won't have all of the item's fields, so you can call
 Get
 ---
 Fetch an item from its primary key fields. This will be faster than a query,
-but requires you to know the primary key/keys of all items you want fetched.
+but requires you to know the primary keys of all items you want fetched.
 
 .. code-block:: python
 

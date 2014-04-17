@@ -1,10 +1,9 @@
 """ Field declarations for models """
+import six
 import inspect
 import json
-from boto.dynamodb2.fields import (RangeKey, AllIndex, KeysOnlyIndex,
-                                   IncludeIndex)
-from boto.dynamodb2.types import (NUMBER, STRING, BINARY, NUMBER_SET,
-                                  STRING_SET, BINARY_SET)
+from dynamo3 import (DynamoKey, LocalIndex, NUMBER, STRING, BINARY, NUMBER_SET,
+                     STRING_SET, BINARY_SET)
 from decimal import Decimal
 
 from .conditions import Condition
@@ -63,7 +62,7 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=unicode, coerce=False, check=None, default=NO_ARG):
+                 data_type=six.text_type, coerce=False, check=None, default=NO_ARG):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         self.name = None
@@ -87,8 +86,8 @@ class Field(object):
         self.subfields = []
         self.index = False
         self.index_name = None
-        self._boto_index = None
-        self._boto_index_kwargs = None
+        self._ddb_index = None
+        self._ddb_index_kwargs = None
         if default is NO_ARG:
             if self.is_set:
                 self.default = set()
@@ -99,21 +98,21 @@ class Field(object):
         if index:
             self.all_index(index)
 
-    def get_boto_index(self, hash_key):
-        """ Construct a boto index object from a hash key """
-        parts = [hash_key, RangeKey(self.name, data_type=self.ddb_data_type)]
-        return self._boto_index(self.index_name, parts=parts,
-                                **self._boto_index_kwargs)
+    def get_ddb_index(self):
+        """ Construct a dynamo local index object """
+        range_key = DynamoKey(self.name, data_type=self.ddb_data_type)
+        return self._ddb_index(self.index_name, range_key,
+                               **self._ddb_index_kwargs)
 
-    def _set_boto_index(self, name, boto_index, **kwargs):
+    def _set_ddb_index(self, name, factory, **kwargs):
         """ Set the type of index """
         if self.hash_key or self.range_key:
             raise ValueError("Cannot index the hash or range key!")
         if self.index:
             raise ValueError("Index is already set!")
         self.index_name = name
-        self._boto_index = boto_index
-        self._boto_index_kwargs = kwargs
+        self._ddb_index = factory
+        self._ddb_index_kwargs = kwargs
         self.index = True
 
     def all_index(self, name):
@@ -126,7 +125,7 @@ class Field(object):
             The name of the index
 
         """
-        self._set_boto_index(name, AllIndex)
+        self._set_ddb_index(name, LocalIndex.all)
         return self
 
     def keys_index(self, name):
@@ -139,7 +138,7 @@ class Field(object):
             The name of the index
 
         """
-        self._set_boto_index(name, KeysOnlyIndex)
+        self._set_ddb_index(name, LocalIndex.keys)
         return self
 
     def include_index(self, name, includes=None):
@@ -155,7 +154,7 @@ class Field(object):
 
         """
         includes = includes or []
-        self._set_boto_index(name, IncludeIndex, includes=includes)
+        self._set_ddb_index(name, LocalIndex.include, includes=includes)
         return self
 
     def coerce(self, value, force_coerce=None):
@@ -182,11 +181,6 @@ class Field(object):
         """ Return True if data type is a set """
         return self.ddb_data_type in (STRING_SET, NUMBER_SET, BINARY_SET)
 
-    @classmethod
-    def is_null(cls, value):
-        """ Return True if the value corresponds to null inside dynamo """
-        return value is None or value == set()
-
     def ddb_dump(self, value):
         """ Dump a value to its Dynamo format """
         if value is None:
@@ -211,8 +205,7 @@ class Field(object):
         """ Dump an overflow value to its Dynamo format """
         if val is None:
             return None
-        elif (isinstance(val, int) or isinstance(val, float) or
-              isinstance(val, long)):
+        elif isinstance(val, six.integer_types) or isinstance(val, float):
             return val
         elif isinstance(val, set):
             return val
@@ -223,7 +216,7 @@ class Field(object):
     def ddb_load_overflow(cls, val):
         """ Decode a value of an overflow field """
         if (isinstance(val, Decimal) or isinstance(val, float) or
-           isinstance(val, int) or isinstance(val, long)):
+                isinstance(val, six.integer_types)):
             if val % 1 == 0:
                 return int(val)
             return float(val)
@@ -242,7 +235,7 @@ class Field(object):
 
     @property
     def ddb_data_type(self):
-        """ Get the DynamoDB data type as used by boto """
+        """ Get the native DynamoDB data type """
         return self.data_type.ddb_data_type
 
     def can_resolve(self, fields):

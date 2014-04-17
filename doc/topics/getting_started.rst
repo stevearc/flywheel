@@ -29,9 +29,7 @@ Here are the steps to set up a simple example model with flywheel:
 
     # Create an engine and connect to an AWS region
     engine = Engine()
-    engine.connect_to_region('us-east-1',
-                             aws_access_key_id=<YOUR AWS ACCESS KEY>,
-                             aws_secret_access_key=<YOUR AWS SECRET KEY>)
+    engine.connect_to_region('us-east-1')
 
     # Register our model with the engine so it can create the Dynamo table
     engine.register(Tweet)

@@ -42,10 +42,11 @@ metadata about the model. This metadata object has the :meth:`create
 
 .. code-block:: python
 
-    from boto.dynamodb2 import connect_to_region
+    from dynamo3 import DynamoDBConnection
 
-    connection = connect_to_region('us-east-1')
+    connection = DynamoDBConnection.connect_to_region('us-east-1')
     Tweet.meta_.create_dynamo_schema(connection)
+    Tweet.meta_.delete_dynamo_schema(connection)
 
 You can also register your models with the engine and create all the tables at once:
 

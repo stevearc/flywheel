@@ -1,5 +1,5 @@
 """ Query and Scan builders """
-from boto.dynamodb2.table import Table
+import six
 
 from .fields import Condition
 
@@ -25,10 +25,14 @@ class Query(object):
         self.condition = Condition()
 
     @property
-    def table(self):
-        """ Shortcut to access dynamo table """
-        return Table(self.model.meta_.ddb_tablename,
-                     connection=self.engine.dynamo)
+    def dynamo(self):
+        """ Shortcut to access DynamoDBConnection """
+        return self.engine.dynamo
+
+    @property
+    def tablename(self):
+        """ Shortcut to access dynamo table name """
+        return self.model.meta_.ddb_tablename(self.engine.namespace)
 
     def gen(self, desc=False, consistent=False, attributes=None):
         """
@@ -42,15 +46,19 @@ class Query(object):
             Force a consistent read of the data (default False)
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, gen() will
-            iterate over boto ResultItems instead of model objects.
+            iterate over dicts instead of model objects.
+
+        Returns
+        -------
+        results : generator
 
         """
         kwargs = self.condition.query_kwargs(self.model)
         if attributes is not None:
             kwargs['attributes'] = attributes
-        kwargs['reverse'] = not desc
+        kwargs['desc'] = desc
         kwargs['consistent'] = consistent
-        results = self.table.query(**kwargs)
+        results = self.dynamo.query(self.tablename, **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
@@ -71,12 +79,28 @@ class Query(object):
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
-            List of fields to retrieve from dynamo. If supplied, returns boto
-            ResultItems instead of model objects.
+            List of fields to retrieve from dynamo. If supplied, returns dicts
+            instead of model objects.
+
+        Returns
+        -------
+        results : list
 
         """
         return list(self.gen(desc=desc, consistent=consistent,
                              attributes=attributes))
+
+    def count(self):
+        """
+        Find the number of elements the match this query
+
+        Returns
+        -------
+        count : int
+
+        """
+        kwargs = self.condition.query_kwargs(self.model)
+        return self.dynamo.query(self.tablename, count=True, **kwargs)
 
     def first(self, desc=False, consistent=False, attributes=None):
         """
@@ -89,8 +113,12 @@ class Query(object):
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
-            List of fields to retrieve from dynamo. If supplied, returns boto
-            ResultItems instead of model objects.
+            List of fields to retrieve from dynamo. If supplied, returns dicts
+            instead of model objects.
+
+        Returns
+        -------
+        result : :class:`~flywheel.models.Model` or None
 
         """
         self.limit(1)
@@ -109,8 +137,12 @@ class Query(object):
         consistent : bool, optional
             Force a consistent read of the data (default False)
         attributes : list, optional
-            List of fields to retrieve from dynamo. If supplied, returns boto
-            ResultItems instead of model objects.
+            List of fields to retrieve from dynamo. If supplied, returns dicts
+            instead of model objects.
+
+        Returns
+        -------
+        result : :class:`~flywheel.models.Model`
 
         Raises
         ------
@@ -173,7 +205,7 @@ class Query(object):
         """
         for condition in conditions:
             self.condition &= condition
-        for key, val in kwargs.iteritems():
+        for key, val in six.iteritems(kwargs):
             field = self.model.meta_.fields.get(key)
             if field is not None:
                 self.condition &= (field == val)
@@ -208,12 +240,16 @@ class Scan(Query):
 
         if attributes is not None:
             kwargs['attributes'] = attributes
-        results = self.table.scan(**kwargs)
+        results = self.dynamo.scan(self.tablename, **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
             else:
                 yield self.model.ddb_load_(self.engine, result)
+
+    def count(self):
+        kwargs = self.condition.scan_kwargs()
+        return self.dynamo.scan(self.tablename, count=True, **kwargs)
 
     def index(self, name):
         raise TypeError("Scan cannot use an index!")
