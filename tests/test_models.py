@@ -259,6 +259,29 @@ class TestModelMutation(DynamoSystemTest):
             self.assertTrue(ItemUpdate.put('foobar', ANY) in captured_updates)
             self.assertTrue(ItemUpdate.put('points', ANY) in captured_updates)
 
+    def test_sync_constraints(self):
+        """ Sync can accept more complex constraints """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p.ts = 7
+        p.sync(constraints=[Post.ts < 5])
+        p2 = self.engine.scan(Post).first()
+        self.assertEquals(p2.ts, 7)
+
+    def test_sync_constraints_fail(self):
+        """ Sync fails if complex constraints fail """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p.ts = 7
+        with self.assertRaises(ConditionalCheckFailedException):
+            p.sync(constraints=[Post.ts > 5])
+
+    def test_sync_constraints_must_raise(self):
+        """ Sync with constraints fails if raise_on_conflict is False """
+        p = Post('a', 'b', 4)
+        with self.assertRaises(ValueError):
+            p.sync(raise_on_conflict=False, constraints=[Post.ts < 5])
+
     def test_delete(self):
         """ Model can delete itself """
         p = Post('a', 'b', 4)

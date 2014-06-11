@@ -458,10 +458,11 @@ class Engine(object):
                         item.post_save_()
             else:
                 for item in items:
-                    expected = dict(((k, None) for k in item.pk_dict_))
+                    expected = dict(((k + '__null', True) for k in
+                                     item.pk_dict_))
                     item.pre_save_(self)
                     self.dynamo.put_item(tablename, item.ddb_dump_(),
-                                         expected=expected)
+                                         **expected)
                     item.post_save_()
 
     def refresh(self, items, consistent=False):
@@ -494,7 +495,7 @@ class Engine(object):
                     for key, val in data.items():
                         item.set_ddb_val_(key, val)
 
-    def sync(self, items, raise_on_conflict=None, consistent=False):
+    def sync(self, items, raise_on_conflict=None, consistent=False, constraints=None):
         """
         Sync model changes back to database
 
@@ -512,6 +513,10 @@ class Engine(object):
         consistent : bool, optional
             If True, force a consistent read from the db. This will only take
             effect if the sync is only performing a read. (default False)
+        constraints : list, optional
+            List of more complex constraints that must pass for the update to
+            complete. Must be used with raise_on_conflict=True. Format is the
+            same as query filters (e.g. Model.fieldname > 5)
 
         Raises
         ------
@@ -521,6 +526,8 @@ class Engine(object):
         """
         if raise_on_conflict is None:
             raise_on_conflict = self.default_conflict in ('update', 'raise')
+        if constraints is not None and not raise_on_conflict:
+            raise ValueError("Cannot pass constraints to sync() when raise_on_conflict is False")
         if isinstance(items, Model):
             items = [items]
         refresh_models = []
@@ -556,13 +563,21 @@ class Engine(object):
                         _raise_on_conflict = True
                         break
 
+            keywords = {}
+            constrained_fields = set()
+            if _raise_on_conflict and constraints is not None:
+                for constraint in constraints:
+                    constrained_fields.update(constraint.eq_fields.keys())
+                    constrained_fields.update(constraint.fields.keys())
+                    keywords.update(constraint.scan_kwargs())
+
             updates = []
             # Set dynamo keys
             for name in fields:
                 field = item.meta_.fields.get(name)
                 value = getattr(item, name)
                 kwargs = {}
-                if _raise_on_conflict:
+                if _raise_on_conflict and name not in constrained_fields:
                     kwargs['expected'] = item.ddb_dump_cached_(name)
                 update = ItemUpdate.put(name, item.ddb_dump_field_(name),
                                         **kwargs)
@@ -581,7 +596,7 @@ class Engine(object):
             # Perform sync
             ret = self.dynamo.update_item(
                 item.meta_.ddb_tablename(self.namespace), item.pk_dict_,
-                updates, returns=ALL_NEW)
+                updates, returns=ALL_NEW, **keywords)
 
             # Load updated data back into object
             with item.loading_(self):

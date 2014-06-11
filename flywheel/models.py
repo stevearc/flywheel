@@ -122,7 +122,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
     _persisted = False
     _loading = False
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # pylint: disable=W0231
         if len(args) > 2 or len(args) > 1 and self.meta_.range_key is None:
             raise TypeError("Too many positional arguments!")
         if len(args) > 0:
@@ -139,12 +139,13 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
         self.__engine__.refresh(self, consistent=consistent)
 
-    def sync(self, raise_on_conflict=None):
+    def sync(self, raise_on_conflict=None, constraints=None):
         """ Sync model changes back to database """
         if self.__engine__ is None:
             raise ValueError("Cannot sync: No DB connection")
 
-        self.__engine__.sync(self, raise_on_conflict=raise_on_conflict)
+        self.__engine__.sync(self, raise_on_conflict=raise_on_conflict,
+                             constraints=constraints)
 
     def delete(self, raise_on_conflict=None):
         """ Delete the model from the database """
