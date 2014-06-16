@@ -1,6 +1,5 @@
 """ Tests for engine queries """
 from six.moves import xrange as _xrange  # pylint: disable=F0401
-import six
 from flywheel import Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex
 from flywheel.tests import DynamoSystemTest
 
@@ -309,6 +308,16 @@ class TestQueries(DynamoSystemTest):
             self.engine.query(User).filter(name='Adam').index('name-index')\
                 .index('score-index').all()
 
+    def test_filter_non_indexed(self):
+        """ Queries can filter non-indexed fields """
+        u = User(id='a', name='Adam', foo='bar')
+        u2 = User(id='a', name='Billy', foo='baz')
+        self.engine.save([u, u2])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(foo='bar').all()
+        self.assertEquals(results, [u])
+
 
 class TestCompositeQueries(DynamoSystemTest):
 
@@ -354,16 +363,17 @@ class TestCompositeQueries(DynamoSystemTest):
         p = Post(type='tweet', id='1234', username='abc')
         self.engine.save(p)
 
-        results = self.engine(Post).filter(username='abc', score=0).all()
+        results = self.engine(Post).filter(username='abc', score=0) \
+            .index('name-index').all()
         self.assertEquals(results, [p])
 
     def test_composite_global_index_piecewise(self):
-        """ Auto-select composite global secondary indexes by pieces """
+        """ Use composite global secondary indexes by pieces """
         p = Post(type='tweet', id='1234', username='abc')
         self.engine.save(p)
 
         results = self.engine(Post).filter(username='abc', ts=0,
-                                           upvotes=0).all()
+                                           upvotes=0).index('name-index').all()
         self.assertEquals(results, [p])
 
     def test_ambiguous_index(self):

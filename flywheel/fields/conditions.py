@@ -55,19 +55,7 @@ class Condition(object):
             raise ValueError("Bad query arguments. You must provide a hash "
                              "key and may optionally constrain on exactly one "
                              "range key")
-        kwargs = ordering.query_kwargs(**self.eq_fields)
-        if ordering.range_key is not None:
-            if len(self.fields) > 0:
-                key, (op, val) = six.next(six.iteritems(self.fields))
-                kwargs['%s__%s' % (key, op)] = val
-            else:
-                try:
-                    key = '%s__eq' % ordering.range_key.name
-                    val = ordering.range_key.resolve(scope=self.eq_fields)
-                    kwargs[key] = val
-                except KeyError:
-                    # No range key constraint in query
-                    pass
+        kwargs = ordering.query_kwargs(self.eq_fields, self.fields)
 
         if self.limit is not None:
             kwargs['limit'] = self.limit

@@ -84,10 +84,10 @@ One way to delete items from a table is with a query. Calling
     engine.query(Tweet).filter(Tweet.userid == 'abc123',
                                Tweet.ts < oldts).delete()
 
-99% of the time the query engine will be able to automatically detect which
-local or global secondary index you intend to use. For that 1% of the time when
-it's ambiguous, you can manually specify the index. This can also be useful if
-you want the results to be sorted by a particular index:
+Most of the time the query engine will be able to automatically detect which
+local or global secondary index you intend to use. If the index is ambiguous,
+you can manually specify the index. This can also be useful if you want the
+results to be sorted by a particular index when only querying the hash key.
 
 .. code-block:: python
 
@@ -98,13 +98,23 @@ you want the results to be sorted by a particular index:
         ts = Field(data_type=datetime, index='ts-index')
         retweets = Field(data_type=int, index='rt-index')
 
+    # This returns 10 tweets in id order (more-or-less random)
+    ten_tweets = engine.query(Tweet).filter(userid='abc123').limit(10).all()
+
     # Get the 10 most retweeted tweets for a user
     top_ten = engine.query(Tweet).filter(userid='abc123').index('rt-index')\
             .limit(10).all(desc=True)
 
     # Get The 10 most recent tweets for a user
-    top_ten = engine.query(Tweet).filter(userid='abc123').index('ts-index')\
+    ten_recent = engine.query(Tweet).filter(userid='abc123').index('ts-index')\
             .limit(10).all(desc=True)
+
+**New in 0.2.1**
+
+Queries can filter on fields that are not the hash or range key. Filtering this
+way will strip out the results server-side, but it will not use an index. When
+filtering on these extra fields, you may use the additional filter operations
+that are listed under :ref:`scan`.
 
 Shorthand
 ---------
@@ -134,6 +144,8 @@ filter:
 
     # Multiple filters in same statement
     engine(Tweet).filter(Tweet.ts <= earlyts, userid='abc123').all()
+
+.. _scan:
 
 Table Scans
 -----------
