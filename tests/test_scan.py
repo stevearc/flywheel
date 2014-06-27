@@ -179,7 +179,9 @@ class TestScan(DynamoSystemTest):
 
         results = self.engine.scan(User).filter(foo='bar', bar='baz') \
             .all(filter_or=True)
-        self.assertItemsEqual(results, [u, u2])
+        self.assertEqual(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
 
 
 class TestScanFilterOverflow(DynamoSystemTest):
