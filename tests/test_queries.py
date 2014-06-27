@@ -327,7 +327,9 @@ class TestQueries(DynamoSystemTest):
 
         results = self.engine.query(User).filter(User.id == 'a')\
             .filter(foo='bar', bar='baz').all(filter_or=True)
-        self.assertItemsEqual(results, [u, u2])
+        self.assertEqual(len(results), 2)
+        self.assertTrue(u in results)
+        self.assertTrue(u2 in results)
 
 
 class TestCompositeQueries(DynamoSystemTest):
