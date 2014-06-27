@@ -31,12 +31,38 @@ class Ordering(object):
         self.range_key = range_key
         self.index_name = index_name
 
-    def query_kwargs(self, **kwargs):
-        """ Get the query kwargs for querying against this index """
+    def query_kwargs(self, eq_fields, fields):
+        """ Get the query and filter kwargs for querying against this index """
         kwargs = {'%s__eq' % self.hash_key.name:
-                  self.hash_key.resolve(scope=kwargs)}
+                  self.hash_key.resolve(scope=eq_fields)}
         if self.index_name is not None:
             kwargs['index'] = self.index_name
+        remaining = set(eq_fields)
+        remaining = remaining.union(fields)
+        remaining -= self.hash_key.can_resolve(eq_fields)
+        if self.range_key is not None:
+            eq_range_fields = self.range_key.can_resolve(eq_fields)
+            if eq_range_fields:
+                remaining -= eq_range_fields
+                key = '%s__eq' % self.range_key.name
+                val = self.range_key.resolve(scope=eq_fields)
+                kwargs[key] = val
+            else:
+                for field in self.range_key.can_resolve(fields):
+                    (op, val) = fields[field]
+                    kwargs['%s__%s' % (field, op)] = val
+                    remaining.remove(field)
+
+        # Find the additional filter arguments
+        filter_fields = {}
+        for key in remaining:
+            if key in eq_fields:
+                filter_fields['%s__eq' % key] = eq_fields[key]
+            else:
+                op, val = fields[key]
+                filter_fields['%s__%s' % (key, op)] = val
+        kwargs['filter'] = filter_fields
+
         return kwargs
 
     def __repr__(self):
@@ -234,12 +260,11 @@ class ModelMetadata(object):
             # hash key could not be satisfied
             if len(needed) == 0:
                 continue
-            remaining = set(eq_fields) - needed
 
             if order.range_key is None:
                 # If the ordering has no range key, it must be satisfied
                 # entirely by the hash key
-                if len(remaining) > 0 or len(fields) > 0:
+                if len(fields) > 0:
                     continue
                 else:
                     orderings.append(order)
@@ -248,16 +273,9 @@ class ModelMetadata(object):
             else:
                 # If there are no non-equality fields, range key must be in the
                 # eq_fields
-                if len(fields) == 0:
-                    rng_fields = set(eq_fields)
-                    rng_needed = order.range_key.can_resolve(rng_fields)
-                    # hash and range key must use all eq_fields
-                    if len(remaining - rng_needed) != 0:
-                        continue
-                else:
-                    # If there are eq_fields left over, continue
+                if len(fields) > 0:
                     # If there is more than 1 inequality constraint, continue
-                    if len(remaining) != 0 or len(fields) > 1:
+                    if len(fields) > 1:
                         continue
                     if order.range_key.name not in fields:
                         continue

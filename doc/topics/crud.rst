@@ -185,6 +185,21 @@ And to delete:
 Note than you can pass in a single value or a set of values to both ``add_``
 and ``remove_``.
 
+Sync-if-Constraints
+^^^^^^^^^^^^^^^^^^^
+**New in 0.2.1**
+
+You may pass in a list of constraints to check upon sync. If any of the
+constraints fail, then the sync will not complete. This should be used with
+``raise_on_conflict=True``. For example:
+
+.. code-block:: python
+
+    >>> account = engine.get(Account, username='dsa')
+    >>> account.incr_(moneys=-200)
+    >>> # atomically remove $200 from DSA's account, iff there is at least $200 to remove.
+    >>> account.sync(constraints=[Account.moneys >= 200])
+
 Default Conflict Behavior
 -------------------------
 You can configure the default behavior for each of these endpoints using
