@@ -34,7 +34,8 @@ class Query(object):
         """ Shortcut to access dynamo table name """
         return self.model.meta_.ddb_tablename(self.engine.namespace)
 
-    def gen(self, desc=False, consistent=False, attributes=None):
+    def gen(self, desc=False, consistent=False, attributes=None,
+            filter_or=False):
         """
         Return the query results as a generator
 
@@ -47,6 +48,9 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, gen() will
             iterate over dicts instead of model objects.
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
 
         Returns
         -------
@@ -56,9 +60,9 @@ class Query(object):
         kwargs = self.condition.query_kwargs(self.model)
         if attributes is not None:
             kwargs['attributes'] = attributes
-        kwargs['desc'] = desc
-        kwargs['consistent'] = consistent
-        results = self.dynamo.query(self.tablename, **kwargs)
+        results = self.dynamo.query(self.tablename, desc=desc,
+                                    consistent=consistent, filter_or=filter_or,
+                                    **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
@@ -68,7 +72,8 @@ class Query(object):
     def __iter__(self):
         return self.gen()
 
-    def all(self, desc=False, consistent=False, attributes=None):
+    def all(self, desc=False, consistent=False, attributes=None,
+            filter_or=False):
         """
         Return the query results as a list
 
@@ -81,6 +86,9 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
 
         Returns
         -------
@@ -88,11 +96,17 @@ class Query(object):
 
         """
         return list(self.gen(desc=desc, consistent=consistent,
-                             attributes=attributes))
+                             attributes=attributes, filter_or=filter_or))
 
-    def count(self):
+    def count(self, filter_or=False):
         """
         Find the number of elements the match this query
+
+        Parameters
+        ----------
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
 
         Returns
         -------
@@ -100,9 +114,11 @@ class Query(object):
 
         """
         kwargs = self.condition.query_kwargs(self.model)
-        return self.dynamo.query(self.tablename, count=True, **kwargs)
+        return self.dynamo.query(self.tablename, count=True,
+                                 filter_or=filter_or, **kwargs)
 
-    def first(self, desc=False, consistent=False, attributes=None):
+    def first(self, desc=False, consistent=False, attributes=None,
+              filter_or=False):
         """
         Return the first result of the query, or None if no results
 
@@ -115,6 +131,9 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
 
         Returns
         -------
@@ -123,11 +142,11 @@ class Query(object):
         """
         self.limit(1)
         for result in self.gen(desc=desc, consistent=consistent,
-                               attributes=attributes):
+                               attributes=attributes, filter_or=filter_or):
             return result
         return None
 
-    def one(self, consistent=False, attributes=None):
+    def one(self, consistent=False, attributes=None, filter_or=False):
         """
         Return the result of the query. If there is not exactly one result,
         raise a ValueError
@@ -139,6 +158,9 @@ class Query(object):
         attributes : list, optional
             List of fields to retrieve from dynamo. If supplied, returns dicts
             instead of model objects.
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
 
         Returns
         -------
@@ -151,7 +173,8 @@ class Query(object):
 
         """
         self.limit(2)
-        items = self.all(consistent=consistent, attributes=attributes)
+        items = self.all(consistent=consistent, attributes=attributes,
+                         filter_or=filter_or)
         if len(items) > 1:
             raise ValueError("More than one result!")
         elif len(items) == 0:
@@ -168,13 +191,22 @@ class Query(object):
         self.condition &= Condition.construct_index(name)
         return self
 
-    def delete(self):
-        """ Delete all items that match the query """
+    def delete(self, filter_or=False):
+        """
+        Delete all items that match the query
+
+        Parameters
+        ----------
+        filter_or : bool, optional
+            If True, multiple filter() constraints will be joined with an OR
+            (default AND).
+
+        """
         meta = self.model.meta_
         attrs = [meta.hash_key.name]
         if meta.range_key is not None:
             attrs.append(meta.range_key.name)
-        results = self.gen(attributes=attrs)
+        results = self.gen(attributes=attrs, filter_or=filter_or)
         return self.engine.delete_key(self.model, results)
 
     def filter(self, *conditions, **kwargs):
@@ -231,7 +263,8 @@ class Scan(Query):
 
     """
 
-    def gen(self, attributes=None, desc=False, consistent=False):
+    def gen(self, attributes=None, desc=False, consistent=False,
+            filter_or=False):
         if desc:
             raise ValueError("Cannot order scan() results")
         if consistent:
@@ -240,16 +273,18 @@ class Scan(Query):
 
         if attributes is not None:
             kwargs['attributes'] = attributes
-        results = self.dynamo.scan(self.tablename, **kwargs)
+        results = self.dynamo.scan(self.tablename, filter_or=filter_or,
+                                   **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
             else:
                 yield self.model.ddb_load_(self.engine, result)
 
-    def count(self):
+    def count(self, filter_or=False):
         kwargs = self.condition.scan_kwargs()
-        return self.dynamo.scan(self.tablename, count=True, **kwargs)
+        return self.dynamo.scan(self.tablename, count=True, filter_or=False,
+                                **kwargs)
 
     def index(self, name):
         raise TypeError("Scan cannot use an index!")

@@ -318,6 +318,17 @@ class TestQueries(DynamoSystemTest):
             .filter(foo='bar').all()
         self.assertEquals(results, [u])
 
+    def test_filter_or(self):
+        """ Queries can join filter constraints with OR """
+        u = User(id='a', name='Adam', foo='bar')
+        u2 = User(id='a', name='Billy', bar='baz')
+        u3 = User(id='a', name='Celine', foo='not', bar='this')
+        self.engine.save([u, u2, u3])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(foo='bar', bar='baz').all(filter_or=True)
+        self.assertItemsEqual(results, [u, u2])
+
 
 class TestCompositeQueries(DynamoSystemTest):
 

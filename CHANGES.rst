@@ -5,6 +5,7 @@ Changelog
 * **Breakage**: Certain queries may now require you to specify an index where it was auto-detected before
 * Feature: Queries can now filter on non-indexed fields
 * Feature: More powerful "sync-if" constraints
+* Feature: Can OR together filter constraints in queries
 
 All changes are due to an `update in the DynamoDB API
 <http://aws.amazon.com/blogs/aws/improved-queries-and-updates-for-dynamodb/>`_

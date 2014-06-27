@@ -170,6 +170,17 @@ class TestScan(DynamoSystemTest):
             .filter(User.str_set.contains_('hi')).all()
         self.assertEquals(results, [u])
 
+    def test_filter_or(self):
+        """ Scan can join filter constraints with OR """
+        u = User(id='a', name='Adam', foo='bar')
+        u2 = User(id='b', name='Billy', bar='baz')
+        u3 = User(id='c', name='Celine', foo='not', bar='this')
+        self.engine.save([u, u2, u3])
+
+        results = self.engine.scan(User).filter(foo='bar', bar='baz') \
+            .all(filter_or=True)
+        self.assertItemsEqual(results, [u, u2])
+
 
 class TestScanFilterOverflow(DynamoSystemTest):
 
