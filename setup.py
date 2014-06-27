@@ -14,7 +14,7 @@ CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
 REQUIREMENTS = [
-    'dynamo3>=0.2.0',
+    'dynamo3>=0.2.1',
     'six'
 ]
 
@@ -29,7 +29,7 @@ if sys.version_info[:2] < (2, 7):
 if __name__ == "__main__":
     setup(
         name='flywheel',
-        version='0.2.0',
+        version='0.2.1',
         description="SQLAlchemy-style ORM for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
