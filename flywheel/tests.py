@@ -18,7 +18,8 @@ class DynamoSystemTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(DynamoSystemTest, cls).setUpClass()
-        cls.engine = Engine(cls.dynamo, ['test'])
+        cls.engine = Engine(cls.dynamo, namespace=['test'],
+                            namespace_separator='X')
         cls.engine.register(*cls.models)
         cls.engine.create_schema()
 

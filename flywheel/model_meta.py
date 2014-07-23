@@ -332,15 +332,19 @@ class ModelMetadata(object):
         """ Getter for abstract """
         return self._abstract
 
-    def ddb_tablename(self, namespace=()):
+    def ddb_tablename(self, namespace=(), namespace_separator='-'):
         """
         The name of the DynamoDB table
 
         Parameters
         ----------
         namespace : list or str, optional
-            String prefix or list of component parts of a prefix for the table
-            name.  The prefix will be this string or strings (joined by '-').
+            String prefix or list of component parts of a prefix for models. All
+            table names will be prefixed by this string or strings (joined by the
+            separator below).
+        namespace_separator: str, optional
+            String to use when joining the namespace to the table name. Default is
+            '-'.
 
         """
         if isinstance(namespace, six.string_types):
@@ -349,7 +353,7 @@ class ModelMetadata(object):
             namespace = tuple(namespace)
         if self.abstract:
             return None
-        return '-'.join(namespace + (self.name,))
+        return namespace_separator.join(namespace + (self.name,))
 
     def validate_model(self):
         """ Perform validation checks on the model declaration """
@@ -386,7 +390,8 @@ class ModelMetadata(object):
                                               "itself" % (name, field.name))
 
     def create_dynamo_schema(self, connection, tablenames=None, test=False,
-                             wait=False, throughput=None, namespace=()):
+                             wait=False, throughput=None, namespace=(),
+                             namespace_separator='-'):
         """
         Create all Dynamo tables for this model
 
@@ -407,6 +412,8 @@ class ModelMetadata(object):
             value.
         namespace : tuple, optional
             The namespace of the table
+        namespace_separator : str, optional
+            The string to use when joining the parts of the table's namespace
 
         Returns
         -------
@@ -418,7 +425,7 @@ class ModelMetadata(object):
             return None
         if tablenames is None:
             tablenames = set(connection.list_tables())
-        tablename = self.ddb_tablename(namespace)
+        tablename = self.ddb_tablename(namespace, namespace_separator)
         if tablename in tablenames:
             return None
         elif test:
@@ -463,7 +470,7 @@ class ModelMetadata(object):
         return tablename
 
     def delete_dynamo_schema(self, connection, tablenames=None, test=False,
-                             wait=False, namespace=()):
+                             wait=False, namespace=(), namespace_separator='-'):
         """
         Drop all Dynamo tables for this model
 
@@ -479,6 +486,8 @@ class ModelMetadata(object):
             If True, block until table has been deleted (default False)
         namespace : tuple, optional
             The namespace of the table
+        namespace_separator : str, optional
+            The string to use when joining the parts of the table's namespace
 
         Returns
         -------
@@ -491,7 +500,7 @@ class ModelMetadata(object):
         if tablenames is None:
             tablenames = set(connection.list_tables())
 
-        tablename = self.ddb_tablename(namespace)
+        tablename = self.ddb_tablename(namespace, namespace_separator)
         if tablename in tablenames:
             if not test:
                 connection.delete_table(tablename)

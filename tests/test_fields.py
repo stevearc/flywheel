@@ -330,7 +330,8 @@ class TestFields(DynamoSystemTest):
         """ Default field values are saved to dynamo """
         w = Widget(string2='abc')
         self.engine.sync(w)
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result, {
             'string': w.string,
@@ -373,7 +374,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=5)
         self.engine.sync(w)
 
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], 5)
         stored_widget = self.engine.scan(Widget).all()[0]
@@ -384,7 +386,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar='hi')
         self.engine.sync(w)
 
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], json.dumps('hi'))
         stored_widget = self.engine.scan(Widget).all()[0]
@@ -396,7 +399,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=foobar)
         self.engine.sync(w)
 
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], foobar)
         stored_widget = self.engine.scan(Widget).all()[0]
@@ -408,7 +412,8 @@ class TestFields(DynamoSystemTest):
         w = Widget(string='a', foobar=foobar)
         self.engine.save(w)
 
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['foobar'], json.dumps(foobar))
         stored_widget = self.engine.scan(Widget).all()[0]

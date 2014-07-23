@@ -21,7 +21,11 @@ class Engine(object):
     dynamo : :class:`dynamodb3.DynamoDBConnection`, optional
     namespace : list or str, optional
         String prefix or list of component parts of a prefix for models. All
-        table names will be prefixed by this string or strings (joined by '-').
+        table names will be prefixed by this string or strings (joined by the
+        separator below).
+    namespace_separator: str, optional
+        String to use when joining the namespace to the table name. Default is
+        '-'.
     default_conflict : {'update', 'overwrite', 'raise'}, optional
         Default setting for delete(), save(), and sync() (default 'update')
 
@@ -72,7 +76,8 @@ class Engine(object):
 
     """
 
-    def __init__(self, dynamo=None, namespace=(), default_conflict='update'):
+    def __init__(self, dynamo=None, namespace=(), namespace_separator='-',
+                 default_conflict='update'):
         if dynamo is not None and not isinstance(dynamo, DynamoDBConnection):
             raise ValueError("'dynamo' needs to be an instance of "
                              "dynamo3.DynamoDBConnection (are you using a "
@@ -80,6 +85,7 @@ class Engine(object):
         self.dynamo = dynamo
         self.models = {}
         self.namespace = namespace
+        self.namespace_separator = namespace_separator
         self._default_conflict = None
         self.default_conflict = default_conflict
 
@@ -200,7 +206,7 @@ class Engine(object):
             result = model.meta_.create_dynamo_schema(
                 self.dynamo, tablenames, test=test, wait=True,
                 throughput=throughput.get(model.meta_.ddb_tablename()),
-                namespace=self.namespace)
+                namespace=self.namespace, namespace_separator=self.namespace_separator)
             if result:
                 changed.append(result)
         return changed
@@ -225,7 +231,8 @@ class Engine(object):
         for model in six.itervalues(self.models):
             result = model.meta_.delete_dynamo_schema(self.dynamo, tablenames,
                                                       test=test, wait=True,
-                                                      namespace=self.namespace)
+                                                      namespace=self.namespace,
+                                                      namespace_separator=self.namespace_separator)
             changed.append(result)
         return changed
 
@@ -233,7 +240,8 @@ class Engine(object):
         """ Get the schema for the registered models """
         schema = []
         for model in six.itervalues(self.models):
-            schema.append(model.meta_.ddb_tablename(self.namespace))
+            schema.append(
+                model.meta_.ddb_tablename(self.namespace, self.namespace_separator))
         return schema
 
     def __call__(self, model):
@@ -304,8 +312,9 @@ class Engine(object):
             keys = [model.meta_.pk_dict(scope=kwargs)]
 
         raw_items = self.dynamo.batch_get(
-            model.meta_.ddb_tablename(self.namespace), keys,
-            consistent=consistent)
+            model.meta_.ddb_tablename(
+                self.namespace, self.namespace_separator),
+            keys, consistent=consistent)
         items = [model.ddb_load_(self, raw_item) for raw_item in raw_items]
         if pkeys is not None:
             return items
@@ -350,7 +359,8 @@ class Engine(object):
             keys = [kwargs]
 
         count = 0
-        tablename = model.meta_.ddb_tablename(self.namespace)
+        tablename = model.meta_.ddb_tablename(
+            self.namespace, self.namespace_separator)
         with self.dynamo.batch_write(tablename) as batch:
             for key in keys:
                 pkey = model.meta_.pk_dict(scope=key)
@@ -393,7 +403,8 @@ class Engine(object):
             return
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
+            tables[item.meta_.ddb_tablename(
+                self.namespace, self.namespace_separator)].append(item)
 
         count = 0
         for tablename, items in six.iteritems(tables):
@@ -448,7 +459,8 @@ class Engine(object):
             return
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
+            tables[item.meta_.ddb_tablename(
+                self.namespace, self.namespace_separator)].append(item)
         for tablename, items in six.iteritems(tables):
             if overwrite:
                 with self.dynamo.batch_write(tablename) as batch:
@@ -484,7 +496,8 @@ class Engine(object):
 
         tables = defaultdict(list)
         for item in items:
-            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
+            tables[item.meta_.ddb_tablename(
+                self.namespace, self.namespace_separator)].append(item)
 
         for tablename, items in six.iteritems(tables):
             keys = [item.pk_dict_ for item in items]
@@ -527,7 +540,8 @@ class Engine(object):
         if raise_on_conflict is None:
             raise_on_conflict = self.default_conflict in ('update', 'raise')
         if constraints is not None and not raise_on_conflict:
-            raise ValueError("Cannot pass constraints to sync() when raise_on_conflict is False")
+            raise ValueError(
+                "Cannot pass constraints to sync() when raise_on_conflict is False")
         if isinstance(items, Model):
             items = [items]
         refresh_models = []
@@ -595,7 +609,8 @@ class Engine(object):
 
             # Perform sync
             ret = self.dynamo.update_item(
-                item.meta_.ddb_tablename(self.namespace), item.pk_dict_,
+                item.meta_.ddb_tablename(
+                    self.namespace, self.namespace_separator), item.pk_dict_,
                 updates, returns=ALL_NEW, **keywords)
 
             # Load updated data back into object

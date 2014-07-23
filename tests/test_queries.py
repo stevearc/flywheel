@@ -300,7 +300,8 @@ class TestQueries(DynamoSystemTest):
     def test_double_limit(self):
         """ Calling limit twice on the same query raises error """
         with self.assertRaises(ValueError):
-            self.engine.query(User).filter(name='Adam').limit(10).limit(5).all()
+            self.engine.query(User).filter(
+                name='Adam').limit(10).limit(5).all()
 
     def test_double_index(self):
         """ Calling index twice on the same query raises error """
