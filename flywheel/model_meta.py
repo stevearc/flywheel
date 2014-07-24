@@ -343,13 +343,12 @@ class ModelMetadata(object):
             name.  The prefix will be this string or strings (joined by '-').
 
         """
-        if isinstance(namespace, six.string_types):
-            namespace = (namespace,)
-        else:
-            namespace = tuple(namespace)
         if self.abstract:
             return None
-        return '-'.join(namespace + (self.name,))
+        elif isinstance(namespace, six.string_types):
+            return namespace + self.name
+        else:
+            return '-'.join(tuple(namespace) + (self.name,))
 
     def validate_model(self):
         """ Perform validation checks on the model declaration """
@@ -405,7 +404,7 @@ class ModelMetadata(object):
             and 'write'. To specify throughput for global indexes, add the name
             of the index as a key and another 'read', 'write' dict as the
             value.
-        namespace : tuple, optional
+        namespace : str or tuple, optional
             The namespace of the table
 
         Returns
@@ -477,7 +476,7 @@ class ModelMetadata(object):
             If True, don't actually delete the table (default False)
         wait : bool, optional
             If True, block until table has been deleted (default False)
-        namespace : tuple, optional
+        namespace : str or tuple, optional
             The namespace of the table
 
         Returns
