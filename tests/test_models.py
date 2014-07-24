@@ -82,7 +82,8 @@ class TestComposite(DynamoSystemTest):
         """ Composite fields stored properly in dynamodb """
         w = Widget('a', 'b', 1)
         self.engine.save(w)
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Widget.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         item = six.next(self.dynamo.scan(tablename))
         self.assertEquals(item['c_range'], w.c_range)
         self.assertEquals(item['c_index'], w.c_index)
@@ -103,7 +104,8 @@ class TestComposite(DynamoSystemTest):
         self.engine.save(w)
         w.text = 'foobar'
         w.sync()
-        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        tablename = w.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         results = self.dynamo.batch_get(tablename,
                                         [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
@@ -122,7 +124,8 @@ class TestComposite(DynamoSystemTest):
         self.engine.save(w)
         w.likes += 2
         w.sync()
-        tablename = w.meta_.ddb_tablename(self.engine.namespace)
+        tablename = w.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         results = self.dynamo.batch_get(tablename,
                                         [{w.meta_.hash_key.name: w.hk_}])
         results = list(results)
@@ -168,7 +171,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Saving item puts it in the database """
         a = Article()
         self.engine.save(a)
-        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        tablename = a.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a.title)
         self.assertIsNone(result.get('text'))
@@ -187,7 +191,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(text='obviously')
         self.engine.save(a2, overwrite=True)
-        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        tablename = a.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(result['text'], a2.text)
@@ -198,7 +203,8 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(a)
         a2 = Article(beta='ih')
         self.engine.save(a2, overwrite=True)
-        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        tablename = a.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(json.loads(result['beta']), a2.beta)
@@ -322,7 +328,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync creates item even if only primary key is set """
         a = Article()
         self.engine.sync(a)
-        tablename = a.meta_.ddb_tablename(self.engine.namespace)
+        tablename = a.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         results = list(self.dynamo.scan(tablename))
         self.assertEquals(len(results), 1)
         result = dict(results[0])
@@ -511,7 +518,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync()
 
-        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        tablename = p.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
@@ -524,7 +532,8 @@ class TestModelMutation(DynamoSystemTest):
         p.incr_(likes=4)
         p.sync(raise_on_conflict=True)
 
-        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        tablename = p.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertEquals(result['ts'], 0)
         self.assertEquals(result['likes'], 4)
@@ -559,7 +568,8 @@ class TestModelMutation(DynamoSystemTest):
         p.foobar = None
         p.sync()
 
-        tablename = p.meta_.ddb_tablename(self.engine.namespace)
+        tablename = p.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         result = six.next(self.dynamo.scan(tablename))
         self.assertFalse('foobar' in result)
 
@@ -705,7 +715,8 @@ class TestCreate(DynamoSystemTest):
 
     def _get_index(self, name):
         """ Get a specific index from the Store table """
-        tablename = Store.meta_.ddb_tablename(self.engine.namespace)
+        tablename = Store.meta_.ddb_tablename(
+            self.engine.namespace, self.engine.namespace_separator)
         desc = self.dynamo.describe_table(tablename)
         for index in desc.indexes + desc.global_indexes:
             if index.name == name:

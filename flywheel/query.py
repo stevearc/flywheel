@@ -32,7 +32,7 @@ class Query(object):
     @property
     def tablename(self):
         """ Shortcut to access dynamo table name """
-        return self.model.meta_.ddb_tablename(self.engine.namespace)
+        return self.model.meta_.ddb_tablename(self.engine.namespace, self.engine.namespace_separator)
 
     def gen(self, desc=False, consistent=False, attributes=None,
             filter_or=False):
