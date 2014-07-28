@@ -1,7 +1,22 @@
 Changelog
 =========
+0.3.0
+-----
+* **Breakage**: Engine namespace is slightly different. If you pass in a string it will be used as the table name prefix with no additional '-' added.
+
+0.2.1
+-----
+* **Breakage**: Certain queries may now require you to specify an index where it was auto-detected before
+* Feature: Queries can now filter on non-indexed fields
+* Feature: More powerful "sync-if" constraints
+* Feature: Can OR together filter constraints in queries
+
+All changes are due to an `update in the DynamoDB API
+<http://aws.amazon.com/blogs/aws/improved-queries-and-updates-for-dynamodb/>`_
+
 0.2.0
 -----
+* **Breakage**: Engine no longer accepts boto connections (using dynamo3 instead)
 * **Breakage**: Removing S3Type (no longer have boto as dependency)
 * Feature: Support Python 3.2 and 3.3
 * Feature: ``.count()`` terminator for queries (:sha:`bf3261c`)
