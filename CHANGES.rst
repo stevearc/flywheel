@@ -1,5 +1,9 @@
 Changelog
 =========
+0.3.0
+-----
+* **Breakage**: Engine namespace is slightly different. If you pass in a string it will be used as the table name prefix with no additional '-' added.
+
 0.2.1
 -----
 * **Breakage**: Certain queries may now require you to specify an index where it was auto-detected before
