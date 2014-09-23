@@ -1,6 +1,7 @@
 """ Tests for engine queries """
 from six.moves import xrange as _xrange  # pylint: disable=F0401
-from flywheel import Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex
+from flywheel import (Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex,
+                      DuplicateEntityException, EntityNotFoundException)
 from flywheel.tests import DynamoSystemTest
 
 
@@ -70,16 +71,22 @@ class TestQueries(DynamoSystemTest):
         self.assertEquals(result, u)
 
     def test_one_many(self):
-        """ If many results, one() raises ValueError """
+        """ If many results, one() raises DuplicateEntityException """
         u = User(id='a', name='Adam')
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
+        # For legacy reasons, make sure it also is a ValueError.
         with self.assertRaises(ValueError):
+            self.engine(User).filter(id='a').one()
+        with self.assertRaises(DuplicateEntityException):
             self.engine(User).filter(id='a').one()
 
     def test_one_none(self):
-        """ If no results, one() raises exception """
+        """ If no results, one() raises EntityNotFoundException """
+        # For legacy reasons, make sure it also is a ValueError.
         with self.assertRaises(ValueError):
+            self.engine(User).filter(id='a').one()
+        with self.assertRaises(EntityNotFoundException):
             self.engine(User).filter(id='a').one()
 
     def test_count(self):

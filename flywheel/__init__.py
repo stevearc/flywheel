@@ -8,3 +8,4 @@ from dynamo3 import (CheckFailed, ConditionalCheckFailedException, Binary,
 from .fields import Field, Composite, GlobalIndex, TypeDefinition, set_
 from .models import Model
 from .engine import Engine
+from .query import DuplicateEntityException, EntityNotFoundException

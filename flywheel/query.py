@@ -4,6 +4,16 @@ import six
 from .fields import Condition
 
 
+class EntityNotFoundException(ValueError):
+
+    """ Raised when results are expected and not found. """
+
+
+class DuplicateEntityException(ValueError):
+
+    """ Raised when too many results are found. """
+
+
 class Query(object):
 
     """
@@ -168,17 +178,19 @@ class Query(object):
 
         Raises
         ------
-        exc : ValueError
-            If there is not exactly one result
+        e1 : :class:`~.EntityNotFoundException`
+            If no entity is found. Subclasses :class:`~ValueError`.
+        e2 : :class:`~.DuplicateEntityException`
+            If more than one entity is found. Subclasses :class:`~ValueError`.
 
         """
         self.limit(2)
         items = self.all(consistent=consistent, attributes=attributes,
                          filter_or=filter_or)
         if len(items) > 1:
-            raise ValueError("More than one result!")
+            raise DuplicateEntityException("More than one result!")
         elif len(items) == 0:
-            raise ValueError("Expected one result!")
+            raise EntityNotFoundException("Expected one result!")
         return items[0]
 
     def limit(self, count):
