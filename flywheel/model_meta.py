@@ -320,11 +320,11 @@ class ModelMetadata(object):
         if ddb_dump:
             hk = self.hash_key.ddb_dump(hk)
         rk = self.rk(obj, scope)
-        key_dict = {self.hash_key.name: hk}
+        key_dict = {self.hash_key.attribute_name: hk}
         if rk is not None:
             if ddb_dump:
                 rk = self.range_key.ddb_dump(rk)
-            key_dict[self.range_key.name] = rk
+            key_dict[self.range_key.attribute_name] = rk
         return key_dict
 
     @property
@@ -433,11 +433,11 @@ class ModelMetadata(object):
         else:
             table_throughput = self.throughput
 
-        hash_key = DynamoKey(self.hash_key.name,
+        hash_key = DynamoKey(self.hash_key.attribute_name,
                              data_type=self.hash_key.ddb_data_type)
         range_key = None
         if self.range_key is not None:
-            range_key = DynamoKey(self.range_key.name,
+            range_key = DynamoKey(self.range_key.attribute_name,
                                   data_type=self.range_key.ddb_data_type)
         for field in six.itervalues(self.fields):
             if field.index:

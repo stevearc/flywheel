@@ -53,12 +53,14 @@ class GlobalIndex(object):
 
     def get_ddb_index(self, fields):
         """ Get the dynamo index class for this GlobalIndex """
-        hash_key = DynamoKey(self.hash_key,
-                             data_type=fields[self.hash_key].ddb_data_type)
+        hash_key = fields[self.hash_key]
+        hash_key = DynamoKey(hash_key.attribute_name,
+                             data_type=hash_key.ddb_data_type)
         range_key = None
         if self.range_key is not None:
-            range_key = DynamoKey(self.range_key,
-                                  data_type=fields[self.range_key].ddb_data_type)
+            range_key = fields[self.range_key]
+            range_key = DynamoKey(range_key.attribute_name,
+                                  data_type=range_key.ddb_data_type)
         index = self.ddb_index(self.name, hash_key, range_key,
                                throughput=self._throughput, **self.kwargs)
         return index

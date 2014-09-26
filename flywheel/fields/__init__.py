@@ -62,10 +62,12 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=six.text_type, coerce=False, check=None, default=NO_ARG):
+                 data_type=six.text_type, coerce=False, check=None, default=NO_ARG,
+                 attribute_name=None):
         if sum((hash_key, range_key)) > 1:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         self.name = None
+        self.attribute_name = attribute_name
         self.model = None
         self.composite = False
         self.overflow = False
@@ -97,6 +99,16 @@ class Field(object):
             self.default = default
         if index:
             self.all_index(index)
+
+    @property
+    def attribute_name(self):
+        """ Column name in dynamo - defaults to self.name """
+        return self._attribute_name or self.name
+
+    @attribute_name.setter
+    def attribute_name(self, value):
+        """ Column name in dynamo - defaults to self.name """
+        self._attribute_name = value
 
     def get_ddb_index(self):
         """ Construct a dynamo local index object """
@@ -414,7 +426,7 @@ class Composite(Field):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *fields, **kwargs):
         self.merge = kwargs.pop('merge', None)
         if self.merge is None:
             self.merge = lambda *args: ':'.join(args)
@@ -423,11 +435,11 @@ class Composite(Field):
                              'check', 'coerce']))
         if unrecognized:
             raise TypeError("Unrecognized keyword args: %s" % unrecognized)
-        if len(args) < 2:
+        if len(fields) < 2:
             raise TypeError("Composite must consist of two or more fields")
         super(Composite, self).__init__(**kwargs)
         self.composite = True
-        self.subfields = args
+        self.subfields = fields
 
     def __contains__(self, key):
         return key in self.subfields
