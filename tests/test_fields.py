@@ -102,6 +102,32 @@ class TestCreateFields(unittest.TestCase):
         Field(data_type=CompressedDict)
         Field(data_type=CompressedDict())
 
+    def test_no_attribute_name(self):
+        """ name and attribute_name default to None """
+        field = Field()
+        assert field.name is None
+        assert field.attribute_name is None
+
+    def test_attribute_name(self):
+        """ attribute_name doesn't override name """
+        field = Field(attribute_name='f')
+        assert field.name is None
+        assert field.attribute_name == 'f'
+
+    def test_name(self):
+        """ attribute_name falls back to name """
+        field = Field()
+        field.name = 'n'
+        assert field.name == 'n'
+        assert field.attribute_name == 'n'
+
+    def test_name_and_attribute_name(self):
+        """ name and attribute_name don't collide """
+        field = Field(attribute_name='f')
+        field.name = 'n'
+        assert field.name == 'n'
+        assert field.attribute_name == 'f'
+
 
 class TestFieldCoerce(unittest.TestCase):
 

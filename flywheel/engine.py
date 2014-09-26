@@ -579,7 +579,10 @@ class Engine(object):
                 kwargs = {}
                 if _raise_on_conflict and name not in constrained_fields:
                     kwargs['expected'] = item.ddb_dump_cached_(name)
-                update = ItemUpdate.put(name, item.ddb_dump_field_(name),
+                value = item.ddb_dump_field_(name)
+                if field is not None:
+                    name = field.attribute_name
+                update = ItemUpdate.put(name, value,
                                         **kwargs)
                 updates.append(update)
 

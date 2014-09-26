@@ -422,8 +422,8 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def ddb_dump_(self):
         """ Return a dict for inserting into DynamoDB """
         data = {}
-        for name in self.meta_.fields:
-            data[name] = self.ddb_dump_field_(name)
+        for name, field in six.iteritems(self.meta_.fields):
+            data[field.attribute_name] = self.ddb_dump_field_(name)
         for name in self._overflow:
             data[name] = self.ddb_dump_field_(name)
 
@@ -433,8 +433,13 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Decode and set a value retrieved from Dynamo """
         if key.startswith('_'):
             pass
-        elif key in self.meta_.fields:
-            setattr(self, key, self.meta_.fields[key].ddb_load(val))
+        for field in six.itervalues(self.meta_.fields):
+            # Safe for fields that don't set attribute_name, since it
+            # defaults to name
+            if field.attribute_name == key:
+                key = field.name
+                setattr(self, key, self.meta_.fields[key].ddb_load(val))
+                break
         else:
             setattr(self, key, Field.ddb_load_overflow(val))
 
@@ -459,7 +464,13 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Construct a dynamo "expects" mapping based on the cached fields """
         if fields is None:
             fields = self.keys_()
-        return dict(((name, self.ddb_dump_cached_(name)) for name in fields))
+        data = {}
+        for name in fields:
+            value = self.ddb_dump_cached_(name)
+            if name in self.meta_.fields:
+                name = self.meta_.fields[name].attribute_name
+            data[name] = value
+        return data
 
     @classmethod
     def field_(cls, name):

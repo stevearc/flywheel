@@ -54,10 +54,11 @@ class Post(Model):
                       merge=lambda x, y, z: None if z else x + y)
     likes = Field(data_type=int, default=0)
     ts = Field(data_type=float, default=0)
-    deleted = Field(data_type=bool, default=False)
+    deleted = Field(data_type=bool, default=False, attribute_name='del')
     points = Field(data_type=Decimal, default=Decimal('0'))
     about = Field()
     text = Field()
+    data = Field(attribute_name='d')
     tags = Field(data_type=set)
     keywords = Composite('text', 'about', data_type=set,
                          merge=lambda t, a: t.split() + a.split(), coerce=True)
@@ -87,6 +88,14 @@ class TestComposite(DynamoSystemTest):
         self.assertEquals(item['c_range'], w.c_range)
         self.assertEquals(item['c_index'], w.c_index)
         self.assertEquals(item['c_plain'], w.c_plain)
+
+    def test_attribute_name(self):
+        """ Fields with custom attribute_names can save/load """
+        p = Post('a', 'b', 1)
+        p.data = "Text"
+        self.engine.save(p)
+        p_ = self.engine.get(Post, userid='a', id='b')
+        assert p == p_
 
     def test_no_change_composite_hash(self):
         """ Changing the hash key raises an exception """
