@@ -563,13 +563,6 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
         stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
         self.assertEquals(w.data, stored_widget.data)
 
-    def test_store_bool(self):
-        """ Dicts track changes and update during sync() """
-        w = PrimitiveWidget(string='a', wobbles=True)
-        self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
-        self.assertTrue(stored_widget.wobbles is True)
-
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
         w = PrimitiveWidget(string='a', created=datetime.utcnow())

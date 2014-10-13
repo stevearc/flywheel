@@ -280,7 +280,7 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync with constraints fails if raise_on_conflict is False """
         p = Post('a', 'b', 4)
         with self.assertRaises(ValueError):
-            p.sync(raise_on_conflict=False, constraints=[Post.ts < 5])
+            self.engine.sync(p, raise_on_conflict=False, constraints=[Post.ts < 5])
 
     def test_delete(self):
         """ Model can delete itself """

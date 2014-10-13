@@ -867,12 +867,12 @@ class TestFilterFields(DynamoSystemTest):
 
     # DICT
     def test_eq_dict(self):
-        """ Cannot use equality filter on dict fields """
+        """ Can use equality filter on dict fields """
         d = {'foo': 'bar'}
         w = Widget(data=d)
         self.engine.save(w)
-        with self.assertRaises(TypeError):
-            self.engine.scan(Widget).filter(Widget.data == d).all()
+        ret = self.engine.scan(Widget).filter(Widget.data == d).first()
+        self.assertEquals(w, ret)
 
     def test_ineq_dict(self):
         """ Cannot use inequality filters on dict fields """
@@ -925,12 +925,12 @@ class TestFilterFields(DynamoSystemTest):
     # LIST
 
     def test_eq_list(self):
-        """ Cannot use equality filter on list fields """
+        """ Can use equality filter on list fields """
         q = ['a']
         w = Widget(queue=q)
         self.engine.save(w)
-        with self.assertRaises(TypeError):
-            self.engine.scan(Widget).filter(Widget.queue == q).all()
+        ret = self.engine.scan(Widget).filter(Widget.queue == q).first()
+        self.assertEquals(w, ret)
 
     def test_ineq_list(self):
         """ Cannot use inequality filters on list fields """
@@ -941,7 +941,7 @@ class TestFilterFields(DynamoSystemTest):
             self.engine.scan(Widget).filter(Widget.queue <= q).all()
 
     def test_in_list(self):
-        """ Cannot use 'in' filter on list fields """
+        """ Can use 'in' filter on list fields """
         q = ['a']
         w = Widget(queue=q)
         self.engine.save(w)
@@ -965,17 +965,19 @@ class TestFilterFields(DynamoSystemTest):
             self.engine.scan(Widget).filter(Widget.queue.between_(q, q)).all()
 
     def test_contains_list(self):
-        """ Cannot use 'contains' filter on list fields """
+        """ Can use 'contains' filter on list fields """
         q = ['a']
         w = Widget(queue=q)
         self.engine.save(w)
-        with self.assertRaises(TypeError):
-            self.engine.scan(Widget).filter(Widget.queue.contains_(q)).all()
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.queue.contains_('a')).first()
+        self.assertEquals(ret, w)
 
     def test_ncontains_list(self):
-        """ Cannot use 'ncontains' filter on list fields """
+        """ Can use 'ncontains' filter on list fields """
         q = ['a']
         w = Widget(queue=q)
         self.engine.save(w)
-        with self.assertRaises(TypeError):
-            self.engine.scan(Widget).filter(Widget.queue.ncontains_(q)).all()
+        ret = self.engine.scan(Widget)\
+            .filter(Widget.queue.ncontains_('b')).first()
+        self.assertEquals(ret, w)
