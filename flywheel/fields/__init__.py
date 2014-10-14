@@ -33,9 +33,9 @@ class Field(object):
         (default unicode)
     coerce : bool, optional
         Attempt to coerce the value if it's the incorrect type (default False)
-    check : callable, optional
-        A function that takes the value and returns True if the value is valid
-        (default None)
+    check : callable or list, optional
+        A function that takes the value and returns True if the value is valid.
+        May also be a list of such functions. (default None)
     default : object, optional
         The default value for this field that will be set when creating a model
         (default None, except for ``set`` data types which default to set())
@@ -62,8 +62,9 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=six.text_type, coerce=False, check=None, default=NO_ARG):
-        if sum((hash_key, range_key)) > 1:
+                 data_type=six.text_type, coerce=False, check=None,
+                 default=NO_ARG):
+        if hash_key and range_key:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         self.name = None
         self.model = None
@@ -80,7 +81,10 @@ class Field(object):
                 raise TypeError("Unrecognized data_type '%s'" % data_type)
             self.data_type = type_factory()
         self._coerce = coerce
-        self.check = check
+        if check is None or hasattr(check, '__iter__'):
+            self.check = check
+        else:
+            self.check = (check,)
         self.hash_key = hash_key
         self.range_key = range_key
         self.subfields = []
@@ -114,6 +118,28 @@ class Field(object):
         self._ddb_index = factory
         self._ddb_index_kwargs = kwargs
         self.index = True
+
+    def validate(self, obj):
+        """
+        Run the validation checks for this field on a model object.
+
+        Parameters
+        ----------
+        obj : :class:`~flywheel.models.Model`
+
+        Raises
+        ------
+        err : :class:`ValueError`
+            Raised if any of the checks fail.
+
+        """
+        if self.check is None:
+            return
+        val = self.resolve(obj)
+        for check in self.check:
+            if not check(val):
+                raise ValueError("Validation check on field %s failed for "
+                                 "value %r" % (self.name, val))
 
     def all_index(self, name):
         """

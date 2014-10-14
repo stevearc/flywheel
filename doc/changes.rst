@@ -1,5 +1,15 @@
 Changelog
 =========
+0.4.0
+-----
+* **Breakage**: Dropping support for python 3.2 due to lack of botocore support
+* **Breakage**: Changing the ``list``, ``dict``, and ``bool`` data types to use native DynamoDB types instead of JSON serializing.
+* Feature: Can now do 'contains' filters on lists
+* Feature: Fields support multiple validation checks
+
+Data type changes are due to an `update in the DynamoDB API
+<https://aws.amazon.com/blogs/aws/dynamodb-update-json-and-more/>`_
+
 0.3.0
 -----
 * **Breakage**: Engine namespace is slightly different. If you pass in a string it will be used as the table name prefix with no additional '-' added.

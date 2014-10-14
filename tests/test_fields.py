@@ -60,7 +60,9 @@ class Widget(Model):
     data_dict = Field(data_type=dict)
     data_list = Field(data_type=list)
     bigdata = Field(data_type=CompressedDict)
-    natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
+    natural_num = Field(data_type=int, check=lambda x: x >= 0, default=1)
+    check_num = Field(data_type=int,
+                      check=(lambda x: x != 0, lambda x: x != 2))
 
     def __init__(self, **kwargs):
         kwargs.setdefault('string', 'abc')
@@ -323,6 +325,17 @@ class TestFields(DynamoSystemTest):
     def test_invalid_check(self):
         """ Widget raises error on save if validation checks fail """
         w = Widget(natural_num=-5)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_multiple_valid_check(self):
+        """ Widget saves if all validation checks pass """
+        w = Widget(check_num=5)
+        self.engine.save(w)
+
+    def test_multiple_invalid_check(self):
+        """ Widget raises error on save if any validation check fails """
+        w = Widget(check_num=2)
         with self.assertRaises(ValueError):
             self.engine.save(w)
 

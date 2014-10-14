@@ -368,11 +368,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Called before saving items """
         self.__engine__ = engine
         for field in six.itervalues(self.meta_.fields):
-            if field.check is not None:
-                val = field.resolve(self)
-                if not field.check(val):
-                    raise ValueError("Validation check on field %s failed "
-                                     "for value %s" % (field.name, val))
+            field.validate(self)
 
     def post_save_(self):
         """ Called after item is saved to database """
