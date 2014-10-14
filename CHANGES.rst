@@ -6,6 +6,7 @@ Changelog
 * **Breakage**: Changing the ``list``, ``dict``, and ``bool`` data types to use native DynamoDB types instead of JSON serializing.
 * Feature: Can now do 'contains' filters on lists
 * Feature: Fields support multiple validation checks
+* Feature: Fields have an easy way to enforce non-null values (``nullable=False``)
 
 Data type changes are due to an `update in the DynamoDB API
 <https://aws.amazon.com/blogs/aws/dynamodb-update-json-and-more/>`_

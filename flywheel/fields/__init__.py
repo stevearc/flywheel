@@ -3,7 +3,7 @@ import six
 import inspect
 import json
 from dynamo3 import (DynamoKey, LocalIndex, NUMBER, STRING, BINARY, NUMBER_SET,
-                     STRING_SET, BINARY_SET)
+                     STRING_SET, BINARY_SET, is_null)
 from decimal import Decimal
 
 from .conditions import Condition
@@ -36,6 +36,9 @@ class Field(object):
     check : callable or list, optional
         A function that takes the value and returns True if the value is valid.
         May also be a list of such functions. (default None)
+    nullable : bool, optional
+        If false, will add a check (above) to ensure the value is not null
+        (default True).
     default : object, optional
         The default value for this field that will be set when creating a model
         (default None, except for ``set`` data types which default to set())
@@ -63,7 +66,7 @@ class Field(object):
 
     def __init__(self, hash_key=False, range_key=False, index=None,
                  data_type=six.text_type, coerce=False, check=None,
-                 default=NO_ARG):
+                 nullable=True, default=NO_ARG):
         if hash_key and range_key:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         self.name = None
@@ -81,10 +84,14 @@ class Field(object):
                 raise TypeError("Unrecognized data_type '%s'" % data_type)
             self.data_type = type_factory()
         self._coerce = coerce
-        if check is None or hasattr(check, '__iter__'):
-            self.check = check
-        else:
-            self.check = (check,)
+        self.check = []
+        if check is not None:
+            if hasattr(check, '__iter__'):
+                self.check = list(check)
+            else:
+                self.check = [check]
+        if not nullable:
+            self.check.append(lambda x: not is_null(x))
         self.hash_key = hash_key
         self.range_key = range_key
         self.subfields = []

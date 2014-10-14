@@ -63,6 +63,9 @@ class Widget(Model):
     natural_num = Field(data_type=int, check=lambda x: x >= 0, default=1)
     check_num = Field(data_type=int,
                       check=(lambda x: x != 0, lambda x: x != 2))
+    not_null = Field(data_type=int, nullable=False, default=0)
+    not_null_natural = Field(data_type=int, check=lambda x: x >= 0,
+                             nullable=False, default=0)
 
     def __init__(self, **kwargs):
         kwargs.setdefault('string', 'abc')
@@ -339,6 +342,24 @@ class TestFields(DynamoSystemTest):
         with self.assertRaises(ValueError):
             self.engine.save(w)
 
+    def test_not_nullable(self):
+        """ Nullable=False prevents null values """
+        w = Widget(not_null=None)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_not_null_other_checks(self):
+        """ Nullable=False is appended to other checks """
+        w = Widget(not_null_natural=None)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_other_checks(self):
+        """ Nullable=False doesn't interfere with other checks """
+        w = Widget(not_null_natural=-1)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
     def test_save_defaults(self):
         """ Default field values are saved to dynamo """
         w = Widget(string2='abc')
@@ -349,6 +370,8 @@ class TestFields(DynamoSystemTest):
             'string': w.string,
             'string2': w.string2,
             'natural_num': 1,
+            'not_null': 0,
+            'not_null_natural': 0,
         })
 
     def test_set_updates(self):
