@@ -3,7 +3,8 @@ Changelog
 0.4.0
 -----
 * **Breakage**: Dropping support for python 3.2 due to lack of botocore support
-* **Breakage**: Changing the ``list``, ``dict``, and ``bool`` data types to use native DynamoDB types instead of JSON serializing.
+* **Breakage**: Changing the ``list``, ``dict``, and ``bool`` data types to use native DynamoDB types instead of JSON serializing
+* **Breakage** and bug fix: Fixing serialization of ``datetime`` and ``date`` objects (for more info see the commit) (:sha:`df049af`)
 * Feature: Can now do 'contains' filters on lists
 * Feature: Fields support multiple validation checks
 * Feature: Fields have an easy way to enforce non-null values (``nullable=False``)
