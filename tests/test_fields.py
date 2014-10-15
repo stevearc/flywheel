@@ -64,7 +64,7 @@ class Widget(Model):
     check_num = Field(data_type=int,
                       check=(lambda x: x != 0, lambda x: x != 2))
     not_null = Field(data_type=int, nullable=False, default=0)
-    not_null_natural = Field(data_type=int, check=lambda x: x >= 0,
+    not_null_natural = Field(data_type=int, check=lambda x: x != 1,
                              nullable=False, default=0)
 
     def __init__(self, **kwargs):
@@ -356,7 +356,7 @@ class TestFields(DynamoSystemTest):
 
     def test_other_checks(self):
         """ Nullable=False doesn't interfere with other checks """
-        w = Widget(not_null_natural=-1)
+        w = Widget(not_null_natural=1)
         with self.assertRaises(ValueError):
             self.engine.save(w)
 
