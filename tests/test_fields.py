@@ -596,28 +596,28 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
         self.engine.save(w)
         w.data['foo'] = 'bar'
         w.sync()
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.data, stored_widget.data)
 
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
         w = PrimitiveWidget(string='a', created=datetime.utcnow())
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.created, stored_widget.created)
 
     def test_date(self):
         """ Can store date & it gets returned as date """
         w = PrimitiveWidget(string='a', birthday=date.today())
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.birthday, stored_widget.birthday)
 
     def test_decimal(self):
         """ Can store decimal & it gets returned as decimal """
         w = PrimitiveWidget(string='a', price=Decimal('3.50'))
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.price, stored_widget.price)
         self.assertTrue(isinstance(stored_widget.price, Decimal))
 
@@ -628,5 +628,5 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
         self.engine.save(w)
         w.friends.append('Fred')  # pylint: disable=E1101
         w.sync()
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.friends, stored_widget.friends)

@@ -1,4 +1,5 @@
 """ Field type definitions """
+import calendar
 import datetime
 import functools
 import six
@@ -416,10 +417,12 @@ class DateTimeType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def ddb_dump(self, value):
-        return float(value.strftime('%s.%f'))
+        seconds = calendar.timegm(value.utctimetuple())
+        milliseconds = value.strftime('%f')
+        return Decimal("%d.%s" % (seconds, milliseconds))
 
     def ddb_load(self, value):
-        return datetime.datetime.fromtimestamp(value)
+        return datetime.datetime.utcfromtimestamp(value)
 
 register_type(DateTimeType)
 
@@ -431,9 +434,10 @@ class DateType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def ddb_dump(self, value):
-        return int(value.strftime('%s'))
+        return calendar.timegm(value.timetuple())
 
     def ddb_load(self, value):
-        return datetime.date.fromtimestamp(value)
+        return datetime.datetime.utcfromtimestamp(value).date()
+
 
 register_type(DateType)
