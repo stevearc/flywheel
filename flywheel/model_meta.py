@@ -234,7 +234,11 @@ class ModelMetadata(object):
 
     def get_ordering_from_fields(self, eq_fields, fields):
         """
-        Get a unique ordering from constraint fields
+        Get a unique ordering from constraint fields.
+
+        This does a best-effort guess of which index is being queried. It
+        prioritizes indexes that have a constraint on the range key. It
+        prioritizes the primary key over local and global indexes.
 
         Parameters
         ----------
@@ -254,41 +258,37 @@ class ModelMetadata(object):
             If more than one possible Ordering is found
 
         """
-        orderings = []
+        index_satisfied_orderings = []
+        other_orderings = []
+        eq_field_set = set(eq_fields)
         for order in self.orderings:
             needed = order.hash_key.can_resolve(eq_fields)
             # hash key could not be satisfied
             if len(needed) == 0:
                 continue
 
-            if order.range_key is None:
-                # If the ordering has no range key, it must be satisfied
-                # entirely by the hash key
-                if len(fields) > 0:
-                    continue
-                else:
-                    orderings.append(order)
-                    continue
+            remaining = eq_field_set - needed
 
+            if order.range_key is not None:
+                if order.range_key.can_resolve(remaining) or order.range_key.can_resolve(fields):
+                    index_satisfied_orderings.append(order)
+                    continue
+            other_orderings.append(order)
+
+        def get_best_ordering(orderings):
+            """ Find the best choice in a list of orderings. """
+            if len(orderings) == 1:
+                return orderings[0]
             else:
-                # If there are no non-equality fields, range key must be in the
-                # eq_fields
-                if len(fields) > 0:
-                    # If there is more than 1 inequality constraint, continue
-                    if len(fields) > 1:
-                        continue
-                    if order.range_key.name not in fields:
-                        continue
+                for order in orderings:
+                    if order.index_name is None:
+                        return order
+                raise ValueError("More than one ordering found: %s" % orderings)
 
-                orderings.append(order)
-
-        if len(orderings) > 1:
-            for order in orderings:
-                if order.index_name is None:
-                    return order
-            raise ValueError("More than one ordering found: %s" % orderings)
-        elif len(orderings) == 1:
-            return orderings[0]
+        if index_satisfied_orderings:
+            return get_best_ordering(index_satisfied_orderings)
+        elif other_orderings:
+            return get_best_ordering(other_orderings)
         else:
             return None
 

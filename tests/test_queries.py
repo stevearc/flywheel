@@ -338,6 +338,16 @@ class TestQueries(DynamoSystemTest):
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
 
+    def test_filter_inequality(self):
+        """ Queries can use inequality filters on non-indexed fields """
+        u = User(id='a', name='Adam', foo=0)
+        u2 = User(id='a', name='Billy', foo=2)
+        self.engine.save([u, u2])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.field_('foo') < 2).all()
+        self.assertEquals(results, [u])
+
 
 class TestCompositeQueries(DynamoSystemTest):
 

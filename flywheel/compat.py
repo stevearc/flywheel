@@ -5,7 +5,7 @@ import six
 class UnicodeMixin(object):
 
     """ Mixin that handles __str__ and __bytes__. Just define __unicode__.  """
-    if six.PY3:
+    if six.PY3:  # pragma: no cover
         def __str__(self):
             return self.__unicode__()
 
