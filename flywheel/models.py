@@ -35,7 +35,8 @@ class SetDelta(object):
             The original set to merge the changes with
 
         """
-        other = other or set()
+        if other is None:
+            other = set()
         new = set()
         new.update(other)
         if self.action == 'ADD':
@@ -123,7 +124,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
     _loading = False
 
     def __init__(self, *args, **kwargs):  # pylint: disable=W0231
-        if len(args) > 2 or len(args) > 1 and self.meta_.range_key is None:
+        if len(args) > 2 or (len(args) > 1 and self.meta_.range_key is None):
             raise TypeError("Too many positional arguments!")
         if len(args) > 0:
             setattr(self, self.meta_.hash_key.name, args[0])

@@ -522,6 +522,13 @@ class TestEngine(DynamoSystemTest):
         self.assertTrue(p in ret)
         self.assertTrue(p2 in ret)
 
+    def test_query_no_range(self):
+        """ Can query a model that has no range key """
+        m = SingleKeyModel()
+        self.engine.save(m)
+        ret = self.engine(SingleKeyModel).filter(id='a').all()
+        self.assertEqual(ret, [m])
+
     def test_get_composite_pieces(self):
         """ Fetch item directly by pieces of composite primary key """
         p = Post(type='tweet', id='1234')

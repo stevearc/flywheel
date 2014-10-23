@@ -456,8 +456,8 @@ class Composite(Field):
                              'check', 'coerce']))
         if unrecognized:
             raise TypeError("Unrecognized keyword args: %s" % unrecognized)
-        if len(args) < 2:
-            raise TypeError("Composite must consist of two or more fields")
+        if len(args) < 1:
+            raise TypeError("Composite must depend on at least one field")
         super(Composite, self).__init__(**kwargs)
         self.composite = True
         self.subfields = args
