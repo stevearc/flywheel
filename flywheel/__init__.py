@@ -1,5 +1,5 @@
 """ flywheel """
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 from dynamo3 import (CheckFailed, ConditionalCheckFailedException, Binary,
                      STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
