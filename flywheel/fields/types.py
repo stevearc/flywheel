@@ -1,13 +1,13 @@
 """ Field type definitions """
-import six
-import functools
+import calendar
 import datetime
-
-import json
-from dynamo3 import (Binary, NUMBER, STRING, BINARY, NUMBER_SET, STRING_SET,
-                     BINARY_SET)
-from dynamo3.types import float_to_decimal
+import functools
+import six
 from decimal import Decimal
+from dynamo3 import (Binary, NUMBER, STRING, BINARY, NUMBER_SET, STRING_SET,
+                     BINARY_SET, BOOL, MAP, LIST)
+from dynamo3.types import float_to_decimal
+
 from flywheel.compat import UnicodeMixin
 
 
@@ -41,7 +41,7 @@ class TypeDefinition(UnicodeMixin):
         The value you wish to pass in to Field as the data_type.
     aliases : list
         Other values that will reference this type if passed to Field
-    ddb_data_type : {STRING, BINARY, NUMBER, STRING_SET, BINARY_SET, NUMBER_SET}
+    ddb_data_type : {STRING, BINARY, NUMBER, STRING_SET, BINARY_SET, NUMBER_SET, BOOL, LIST, MAP}
         The DynamoDB data type that backs this type
     mutable : bool
         If True, flywheel will track updates to this field automatically when
@@ -64,6 +64,10 @@ class TypeDefinition(UnicodeMixin):
                                         'in', 'between', 'beginswith'])
         elif self.ddb_data_type in (NUMBER_SET, STRING_SET, BINARY_SET):
             self.allowed_filters = set(['contains', 'ncontains', 'in'])
+        elif self.ddb_data_type in (MAP, BOOL):
+            self.allowed_filters = set(['eq', 'ne'])
+        elif self.ddb_data_type == LIST:
+            self.allowed_filters = set(['eq', 'ne', 'contains', 'ncontains'])
         else:
             raise ValueError("Unknown dynamo data type '%s'" %
                              self.ddb_data_type)
@@ -254,7 +258,7 @@ class IntType(TypeDefinition):
                 if isinstance(value, float) or isinstance(value, Decimal):
                     if new_val != value:
                         raise ValueError("Refusing to convert "
-                                         "%s to int! Results in data loss!"
+                                         "%r to int! Results in data loss!"
                                          % repr(value))
                 return new_val
             else:
@@ -297,14 +301,13 @@ register_type(DecimalType)
 
 class BoolType(TypeDefinition):
 
-    """ Booleans, backed by a Dynamo Number """
+    """ Boolean type """
 
     data_type = bool
-    ddb_data_type = NUMBER
+    ddb_data_type = BOOL
 
     def __init__(self):
         super(BoolType, self).__init__()
-        self.allowed_filters = set(['eq', 'ne'])
 
     def coerce(self, value, force):
         if not isinstance(value, bool):
@@ -313,12 +316,6 @@ class BoolType(TypeDefinition):
             else:
                 raise TypeError()
         return value
-
-    def ddb_dump(self, value):
-        return int(value)
-
-    def ddb_load(self, value):
-        return bool(value)
 
 register_type(BoolType)
 
@@ -346,7 +343,7 @@ register_type(StringType)
 
 class BinaryType(TypeDefinition):
 
-    """ Binary strings, stored as a str """
+    """ Binary strings, stored as a str/bytes """
     data_type = six.binary_type
     aliases = [BINARY, Binary]
     ddb_data_type = BINARY
@@ -373,14 +370,13 @@ register_type(BinaryType)
 
 class DictType(TypeDefinition):
 
-    """ Dict types, stored as a json string """
+    """ Dict type, stored as a map """
     data_type = dict
-    ddb_data_type = STRING
+    ddb_data_type = MAP
     mutable = True
 
     def __init__(self):
         super(DictType, self).__init__()
-        self.allowed_filters = set()
 
     def coerce(self, value, force):
         if not isinstance(value, dict):
@@ -390,25 +386,18 @@ class DictType(TypeDefinition):
                 raise TypeError()
         return value
 
-    def ddb_dump(self, value):
-        return json.dumps(value)
-
-    def ddb_load(self, value):
-        return json.loads(value)
-
 register_type(DictType)
 
 
 class ListType(TypeDefinition):
 
-    """ List types, stored as a json string """
+    """ List type """
     data_type = list
-    ddb_data_type = STRING
+    ddb_data_type = LIST
     mutable = True
 
     def __init__(self):
         super(ListType, self).__init__()
-        self.allowed_filters = set()
 
     def coerce(self, value, force):
         if not isinstance(value, list):
@@ -417,12 +406,6 @@ class ListType(TypeDefinition):
             else:
                 raise TypeError()
         return value
-
-    def ddb_dump(self, value):
-        return json.dumps(value)
-
-    def ddb_load(self, value):
-        return json.loads(value)
 
 register_type(ListType)
 
@@ -434,10 +417,12 @@ class DateTimeType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def ddb_dump(self, value):
-        return float(value.strftime('%s.%f'))
+        seconds = calendar.timegm(value.utctimetuple())
+        milliseconds = value.strftime('%f')
+        return Decimal("%d.%s" % (seconds, milliseconds))
 
     def ddb_load(self, value):
-        return datetime.datetime.fromtimestamp(value)
+        return datetime.datetime.utcfromtimestamp(value)
 
 register_type(DateTimeType)
 
@@ -449,9 +434,10 @@ class DateType(TypeDefinition):
     ddb_data_type = NUMBER
 
     def ddb_dump(self, value):
-        return int(value.strftime('%s'))
+        return calendar.timegm(value.timetuple())
 
     def ddb_load(self, value):
-        return datetime.date.fromtimestamp(value)
+        return datetime.datetime.utcfromtimestamp(value).date()
+
 
 register_type(DateType)

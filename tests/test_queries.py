@@ -338,6 +338,16 @@ class TestQueries(DynamoSystemTest):
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
 
+    def test_filter_inequality(self):
+        """ Queries can use inequality filters on non-indexed fields """
+        u = User(id='a', name='Adam', foo=0)
+        u2 = User(id='a', name='Billy', foo=2)
+        self.engine.save([u, u2])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.field_('foo') < 2).all()
+        self.assertEquals(results, [u])
+
 
 class TestCompositeQueries(DynamoSystemTest):
 
@@ -511,6 +521,13 @@ class TestEngine(DynamoSystemTest):
         self.assertEqual(len(ret), 2)
         self.assertTrue(p in ret)
         self.assertTrue(p2 in ret)
+
+    def test_query_no_range(self):
+        """ Can query a model that has no range key """
+        m = SingleKeyModel()
+        self.engine.save(m)
+        ret = self.engine(SingleKeyModel).filter(id='a').all()
+        self.assertEqual(ret, [m])
 
     def test_get_composite_pieces(self):
         """ Fetch item directly by pieces of composite primary key """

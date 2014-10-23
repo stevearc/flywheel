@@ -41,19 +41,19 @@ special notes. For more information, the code for data types is located in
 +----------+----------+-------------+---------------------------------------------------------------+
 | float    |          | NUMBER      |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
+| Decimal  |          | NUMBER      |                                                               |
++----------+----------+-------------+---------------------------------------------------------------+
 | set      |          | \*_SET      | This will use the appropriate type of DynamoDB set            |
 +----------+----------+-------------+---------------------------------------------------------------+
-| bool     |          | NUMBER      |                                                               |
+| bool     |          | BOOL        |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
 | datetime |          | NUMBER      | datetimes will be treated as naïve. UTC recommended.          |
 +----------+----------+-------------+---------------------------------------------------------------+
 | date     |          | NUMBER      | dates will be treated as naïve. UTC recommended.              |
 +----------+----------+-------------+---------------------------------------------------------------+
-| Decimal  |          | NUMBER      |                                                               |
+| dict     |          | MAP         |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
-| dict     |          | STRING      | Stored as json-encoded string                                 |
-+----------+----------+-------------+---------------------------------------------------------------+
-| list     |          | STRING      | Stored as json-encoded string                                 |
+| list     |          | LIST        |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
 
 If you attempt to set a field with a type that doesn't match, it will raise a
@@ -111,6 +111,41 @@ the python ``frozenset`` builtin:
     events = Field(data_type=frozenset([date]))
 
 .. _custom_data_type:
+
+Field Validation
+----------------
+You can apply one or more validators to a field. These are functions that
+enforce some constraint on the field value beyond the type. Unlike the type
+checking done above, the validation checks are only run when saving to the
+database. An example:
+
+.. code-block:: python
+
+    class Widget(Model):
+        id = Field(data_type=int, check=lambda x: x > 0)
+
+To apply multiple validation checks, pass them in as a list or tuple:
+
+.. code-block:: python
+
+    def is_odd(x):
+        return x % 2 == 1
+
+    def is_natural(x):
+        return x >= 0
+
+    class Widget(Model):
+        odd_natural_num = Field(data_type=int, check=(is_odd, is_natural))
+
+There is a special case for enforcing that a field is non-null, since it is a
+common case:
+
+.. code-block:: python
+
+    username = Field(nullable=False)
+
+The ``nullable=False`` will generate an additional check to make sure the value
+is non-null.
 
 Custom Types
 ------------
