@@ -1,5 +1,5 @@
 #!/bin/bash -e
-declare -r CONF=".pep8.ini"
+declare -r CONF="setup.cfg"
 declare -r ARGS=(ignore select max-line-length)
 declare -r HELP="usage: $0 [all]
 
