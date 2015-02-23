@@ -443,7 +443,10 @@ class DateTimeType(TypeDefinition):
         return Decimal("%d.%s" % (seconds, milliseconds))
 
     def ddb_load(self, value):
-        return datetime.datetime.utcfromtimestamp(value).replace(tzinfo=UTC)
+        microseconds = 1000000 * (value - int(value))
+        return datetime.datetime.utcfromtimestamp(value) \
+            .replace(tzinfo=UTC) \
+            .replace(microsecond=microseconds)
 
 register_type(DateTimeType)
 
