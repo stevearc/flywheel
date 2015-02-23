@@ -410,6 +410,27 @@ class ListType(TypeDefinition):
 register_type(ListType)
 
 
+ZERO = datetime.timedelta(0)
+
+# https://docs.python.org/2/library/datetime.html#datetime.tzinfo.fromutc
+
+
+class UTCTimezone(datetime.tzinfo):
+
+    """ UTC """
+
+    def utcoffset(self, dt):
+        return ZERO
+
+    def tzname(self, dt):
+        return 'UTC'
+
+    def dst(self, dt):
+        return ZERO
+
+UTC = UTCTimezone()
+
+
 class DateTimeType(TypeDefinition):
 
     """ Datetimes, stored as a unix timestamp """
@@ -422,7 +443,7 @@ class DateTimeType(TypeDefinition):
         return Decimal("%d.%s" % (seconds, milliseconds))
 
     def ddb_load(self, value):
-        return datetime.datetime.utcfromtimestamp(value)
+        return datetime.datetime.utcfromtimestamp(value).replace(tzinfo=UTC)
 
 register_type(DateTimeType)
 
