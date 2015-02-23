@@ -10,6 +10,7 @@ from flywheel.fields.types import DictType, register_type
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex, set_)
 from flywheel.tests import DynamoSystemTest
+from flywheel.fields.types import UTC
 
 
 try:
@@ -601,10 +602,12 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
 
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
-        w = PrimitiveWidget(string='a', created=datetime.utcnow())
+        now = datetime.utcnow().replace(tzinfo=UTC)
+        w = PrimitiveWidget(string='a', created=now)
         self.engine.sync(w)
         stored_widget = self.engine.scan(PrimitiveWidget).one()
-        self.assertEquals(w.created, stored_widget.created)
+        self.assertEquals(now, w.created)
+        self.assertEquals(now, stored_widget.created)
 
     def test_date(self):
         """ Can store date & it gets returned as date """

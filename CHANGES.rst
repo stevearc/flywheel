@@ -1,5 +1,10 @@
 Changelog
 =========
+0.4.1
+-----
+* **Warning**: Stored datetime objects will now be timezone-aware (:sha:`a7c253d`)
+* **Warning**: Stored datetime objects will now keep their microseconds (:sha:`fffe92c`)
+
 0.4.0
 -----
 * **Breakage**: Dropping support for python 3.2 due to lack of botocore support
