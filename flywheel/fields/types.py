@@ -2,6 +2,7 @@
 import calendar
 import datetime
 import functools
+import json
 import six
 from decimal import Decimal
 from dynamo3 import (Binary, NUMBER, STRING, BINARY, NUMBER_SET, STRING_SET,
@@ -9,7 +10,6 @@ from dynamo3 import (Binary, NUMBER, STRING, BINARY, NUMBER_SET, STRING_SET,
 from dynamo3.types import float_to_decimal
 
 from flywheel.compat import UnicodeMixin
-
 
 ALL_TYPES = {}
 
@@ -112,6 +112,21 @@ class TypeDefinition(UnicodeMixin):
 
     def ddb_load(self, value):
         """ Turn a value into this type from a DynamoDB value """
+        return value
+
+    def _attempt_coerce_json(self, value, obj_type):
+        """
+        If a value was previously stored as json, attempt to load it as an
+        obj_type object
+        """
+        if isinstance(value, six.text_type):
+            orig_value = value
+            try:
+                value = json.loads(orig_value)
+                if not isinstance(value, obj_type):
+                    value = orig_value
+            except Exception as e:
+                raise TypeError(e)
         return value
 
     def __repr__(self):
@@ -310,6 +325,7 @@ class BoolType(TypeDefinition):
         super(BoolType, self).__init__()
 
     def coerce(self, value, force):
+        value = self._attempt_coerce_json(value, bool)
         if not isinstance(value, bool):
             if force:
                 return bool(value)
@@ -379,6 +395,7 @@ class DictType(TypeDefinition):
         super(DictType, self).__init__()
 
     def coerce(self, value, force):
+        value = self._attempt_coerce_json(value, dict)
         if not isinstance(value, dict):
             if force:
                 return dict(value)
@@ -400,6 +417,7 @@ class ListType(TypeDefinition):
         super(ListType, self).__init__()
 
     def coerce(self, value, force):
+        value = self._attempt_coerce_json(value, list)
         if not isinstance(value, list):
             if force:
                 return list(value)
