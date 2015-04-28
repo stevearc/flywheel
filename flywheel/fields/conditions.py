@@ -39,7 +39,7 @@ class Condition(object):
 
     def query_kwargs(self, model):
         """ Get the kwargs for doing a table query """
-        scan_only = set(['contains', 'ncontains', 'null', 'in', 'ne'])
+        scan_only = set(['contains', 'ncontains', 'null', 'ne'])
         for op, _ in six.itervalues(self.fields):
             if op in scan_only:
                 raise ValueError("Operation '%s' cannot be used in a query!" %
