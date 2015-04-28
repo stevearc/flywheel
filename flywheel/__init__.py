@@ -1,6 +1,4 @@
 """ flywheel """
-__version__ = '0.3.0'
-
 from dynamo3 import (CheckFailed, ConditionalCheckFailedException, Binary,
                      STRING, NUMBER, BINARY, STRING_SET, NUMBER_SET,
                      BINARY_SET)
@@ -8,3 +6,6 @@ from dynamo3 import (CheckFailed, ConditionalCheckFailedException, Binary,
 from .fields import Field, Composite, GlobalIndex, TypeDefinition, set_
 from .models import Model
 from .engine import Engine
+from .query import DuplicateEntityException, EntityNotFoundException
+
+__version__ = '0.4.1'

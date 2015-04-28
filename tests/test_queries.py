@@ -1,6 +1,7 @@
 """ Tests for engine queries """
 from six.moves import xrange as _xrange  # pylint: disable=F0401
-from flywheel import Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex
+from flywheel import (Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex,
+                      DuplicateEntityException, EntityNotFoundException)
 from flywheel.tests import DynamoSystemTest
 
 
@@ -70,16 +71,22 @@ class TestQueries(DynamoSystemTest):
         self.assertEquals(result, u)
 
     def test_one_many(self):
-        """ If many results, one() raises ValueError """
+        """ If many results, one() raises DuplicateEntityException """
         u = User(id='a', name='Adam')
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
+        # For legacy reasons, make sure it also is a ValueError.
         with self.assertRaises(ValueError):
+            self.engine(User).filter(id='a').one()
+        with self.assertRaises(DuplicateEntityException):
             self.engine(User).filter(id='a').one()
 
     def test_one_none(self):
-        """ If no results, one() raises exception """
+        """ If no results, one() raises EntityNotFoundException """
+        # For legacy reasons, make sure it also is a ValueError.
         with self.assertRaises(ValueError):
+            self.engine(User).filter(id='a').one()
+        with self.assertRaises(EntityNotFoundException):
             self.engine(User).filter(id='a').one()
 
     def test_count(self):
@@ -331,6 +338,16 @@ class TestQueries(DynamoSystemTest):
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
 
+    def test_filter_inequality(self):
+        """ Queries can use inequality filters on non-indexed fields """
+        u = User(id='a', name='Adam', foo=0)
+        u2 = User(id='a', name='Billy', foo=2)
+        self.engine.save([u, u2])
+
+        results = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.field_('foo') < 2).all()
+        self.assertEquals(results, [u])
+
 
 class TestCompositeQueries(DynamoSystemTest):
 
@@ -504,6 +521,13 @@ class TestEngine(DynamoSystemTest):
         self.assertEqual(len(ret), 2)
         self.assertTrue(p in ret)
         self.assertTrue(p2 in ret)
+
+    def test_query_no_range(self):
+        """ Can query a model that has no range key """
+        m = SingleKeyModel()
+        self.engine.save(m)
+        ret = self.engine(SingleKeyModel).filter(id='a').all()
+        self.assertEqual(ret, [m])
 
     def test_get_composite_pieces(self):
         """ Fetch item directly by pieces of composite primary key """

@@ -10,6 +10,7 @@ from flywheel.fields.types import DictType, register_type
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex, set_)
 from flywheel.tests import DynamoSystemTest
+from flywheel.fields.types import UTC
 
 
 try:
@@ -60,7 +61,12 @@ class Widget(Model):
     data_dict = Field(data_type=dict)
     data_list = Field(data_type=list)
     bigdata = Field(data_type=CompressedDict)
-    natural_num = Field(data_type=int, check=lambda x: x > 0, default=1)
+    natural_num = Field(data_type=int, check=lambda x: x >= 0, default=1)
+    check_num = Field(data_type=int,
+                      check=(lambda x: x != 0, lambda x: x != 2))
+    not_null = Field(data_type=int, nullable=False, default=0)
+    not_null_natural = Field(data_type=int, check=lambda x: x != 1,
+                             nullable=False, default=0)
 
     def __init__(self, **kwargs):
         kwargs.setdefault('string', 'abc')
@@ -326,6 +332,35 @@ class TestFields(DynamoSystemTest):
         with self.assertRaises(ValueError):
             self.engine.save(w)
 
+    def test_multiple_valid_check(self):
+        """ Widget saves if all validation checks pass """
+        w = Widget(check_num=5)
+        self.engine.save(w)
+
+    def test_multiple_invalid_check(self):
+        """ Widget raises error on save if any validation check fails """
+        w = Widget(check_num=2)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_not_nullable(self):
+        """ Nullable=False prevents null values """
+        w = Widget(not_null=None)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_not_null_other_checks(self):
+        """ Nullable=False is appended to other checks """
+        w = Widget(not_null_natural=None)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
+    def test_other_checks(self):
+        """ Nullable=False doesn't interfere with other checks """
+        w = Widget(not_null_natural=1)
+        with self.assertRaises(ValueError):
+            self.engine.save(w)
+
     def test_save_defaults(self):
         """ Default field values are saved to dynamo """
         w = Widget(string2='abc')
@@ -336,6 +371,8 @@ class TestFields(DynamoSystemTest):
             'string': w.string,
             'string2': w.string2,
             'natural_num': 1,
+            'not_null': 0,
+            'not_null_natural': 0,
         })
 
     def test_set_updates(self):
@@ -560,35 +597,30 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
         self.engine.save(w)
         w.data['foo'] = 'bar'
         w.sync()
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.data, stored_widget.data)
-
-    def test_store_bool(self):
-        """ Dicts track changes and update during sync() """
-        w = PrimitiveWidget(string='a', wobbles=True)
-        self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
-        self.assertTrue(stored_widget.wobbles is True)
 
     def test_datetime(self):
         """ Can store datetime & it gets returned as datetime """
-        w = PrimitiveWidget(string='a', created=datetime.utcnow())
+        now = datetime.utcnow().replace(tzinfo=UTC)
+        w = PrimitiveWidget(string='a', created=now)
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
-        self.assertEquals(w.created, stored_widget.created)
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
+        self.assertEquals(now, w.created)
+        self.assertEquals(now, stored_widget.created)
 
     def test_date(self):
         """ Can store date & it gets returned as date """
         w = PrimitiveWidget(string='a', birthday=date.today())
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.birthday, stored_widget.birthday)
 
     def test_decimal(self):
         """ Can store decimal & it gets returned as decimal """
         w = PrimitiveWidget(string='a', price=Decimal('3.50'))
         self.engine.sync(w)
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.price, stored_widget.price)
         self.assertTrue(isinstance(stored_widget.price, Decimal))
 
@@ -599,5 +631,5 @@ class TestPrimitiveDataTypes(DynamoSystemTest):
         self.engine.save(w)
         w.friends.append('Fred')  # pylint: disable=E1101
         w.sync()
-        stored_widget = self.engine.scan(PrimitiveWidget).all()[0]
+        stored_widget = self.engine.scan(PrimitiveWidget).one()
         self.assertEquals(w.friends, stored_widget.friends)

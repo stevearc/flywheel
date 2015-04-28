@@ -35,7 +35,8 @@ class SetDelta(object):
             The original set to merge the changes with
 
         """
-        other = other or set()
+        if other is None:
+            other = set()
         new = set()
         new.update(other)
         if self.action == 'ADD':
@@ -123,7 +124,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
     _loading = False
 
     def __init__(self, *args, **kwargs):  # pylint: disable=W0231
-        if len(args) > 2 or len(args) > 1 and self.meta_.range_key is None:
+        if len(args) > 2 or (len(args) > 1 and self.meta_.range_key is None):
             raise TypeError("Too many positional arguments!")
         if len(args) > 0:
             setattr(self, self.meta_.hash_key.name, args[0])
@@ -178,12 +179,15 @@ class Model(six.with_metaclass(ModelMetaclass)):
         obj._persisted = False
         return obj
 
+    def _is_field_primary(self, key):
+        """ Check if a given field is part of the primary key """
+        return ((self.meta_.hash_key.name in self.meta_.related_fields[key]) or
+                (self.meta_.range_key is not None and
+                 self.meta_.range_key.name in self.meta_.related_fields[key]))
+
     def __setattr__(self, name, value):
         if self.persisted_:
-            if ((self.meta_.hash_key.name in self.meta_.related_fields[name])
-                    or (self.meta_.range_key is not None and
-                        self.meta_.range_key.name in
-                        self.meta_.related_fields[name])):
+            if self._is_field_primary(name):
                 if value != getattr(self, name):
                     raise AttributeError(
                         "Cannot change an item's primary key!")
@@ -298,10 +302,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def incr_(self, **kwargs):
         """ Atomically increment a number value """
         for key, val in six.iteritems(kwargs):
-            if ((self.meta_.hash_key.name in self.meta_.related_fields[key])
-                    or (self.meta_.range_key is not None and
-                        self.meta_.range_key.name in
-                        self.meta_.related_fields[key])):
+            if self._is_field_primary(key):
                 raise AttributeError("Cannot increment an item's primary key!")
 
             field = self.meta_.fields.get(key)
@@ -368,11 +369,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Called before saving items """
         self.__engine__ = engine
         for field in six.itervalues(self.meta_.fields):
-            if field.check is not None:
-                val = field.resolve(self)
-                if not field.check(val):
-                    raise ValueError("Validation check on field %s failed "
-                                     "for value %s" % (field.name, val))
+            field.validate(self)
 
     def post_save_(self):
         """ Called after item is saved to database """
@@ -487,9 +484,10 @@ class Model(six.with_metaclass(ModelMetaclass)):
         return hash(self.hk_) + hash(self.rk_)
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__)
-                and self.meta_.name == other.meta_.name and self.hk_ == other.hk_
-                and self.rk_ == other.rk_)
+        return (isinstance(other, self.__class__) and
+                self.meta_.name == other.meta_.name and
+                self.hk_ == other.hk_ and
+                self.rk_ == other.rk_)
 
     def __ne__(self, other):
         return not self.__eq__(other)

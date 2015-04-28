@@ -1,5 +1,22 @@
 Changelog
 =========
+0.4.1
+-----
+* **Warning**: Stored datetime objects will now be timezone-aware (:sha:`a7c253d`)
+* **Warning**: Stored datetime objects will now keep their microseconds (:sha:`fffe92c`)
+
+0.4.0
+-----
+* **Breakage**: Dropping support for python 3.2 due to lack of botocore support
+* **Breakage**: Changing the ``list``, ``dict``, and ``bool`` data types to use native DynamoDB types instead of JSON serializing
+* **Breakage** and bug fix: Fixing serialization of ``datetime`` and ``date`` objects (for more info see the commit) (:sha:`df049af`)
+* Feature: Can now do 'contains' filters on lists
+* Feature: Fields support multiple validation checks
+* Feature: Fields have an easy way to enforce non-null values (``nullable=False``)
+
+Data type changes are due to an `update in the DynamoDB API
+<https://aws.amazon.com/blogs/aws/dynamodb-update-json-and-more/>`_
+
 0.3.0
 -----
 * **Breakage**: Engine namespace is slightly different. If you pass in a string it will be used as the table name prefix with no additional '-' added.

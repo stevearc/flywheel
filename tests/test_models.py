@@ -280,7 +280,7 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync with constraints fails if raise_on_conflict is False """
         p = Post('a', 'b', 4)
         with self.assertRaises(ValueError):
-            p.sync(raise_on_conflict=False, constraints=[Post.ts < 5])
+            self.engine.sync(p, raise_on_conflict=False, constraints=[Post.ts < 5])
 
     def test_delete(self):
         """ Model can delete itself """
@@ -609,6 +609,13 @@ class TestModelMutation(DynamoSystemTest):
         with self.assertRaises(TypeError):
             p.add_(keywords=4)
 
+    def test_no_add_and_set(self):
+        """ Cannot both add_ to a set and set the value in same update """
+        p = Post('a', 'b', 0)
+        p.tags = set(['a'])
+        with self.assertRaises(ValueError):
+            p.add_(tags='b')
+
     def test_remove_from_set_presync(self):
         """ Removing from a set should update local model value """
         p = Post('a', 'b', 0)
@@ -628,6 +635,16 @@ class TestModelMutation(DynamoSystemTest):
         p.sync()
         p2.sync()
         self.assertEqual(p2.tags, set(['d']))
+
+    def test_add_to_overflow_set(self):
+        """ Can atomically add to sets that are not declared Fields """
+        p = Post('a', 'b', 0)
+        p.add_(fooset='a')
+        self.engine.save(p)
+        p.add_(fooset='b')
+        p.sync()
+        ret = self.engine.scan(Post).one()
+        self.assertEqual(ret.fooset, set(['a', 'b']))
 
     def test_remove_set_keyerror(self):
         """ Cannot remove missing elements from set """
@@ -784,3 +801,86 @@ class TestModelMethods(unittest.TestCase):
         """ Comparing a model to None should not throw exception """
         model = Article()
         self.assertNotEqual(model, None)
+
+
+class Bare(Model):
+
+    """ Bare-bones test model """
+
+    id = Field(hash_key=True)
+    score = Field(range_key=True, data_type=int)
+
+
+class TestModelDefaults(unittest.TestCase):
+
+    """ Test default model methods. """
+
+    def test_default_constructor(self):
+        """ Model should have a default constructor """
+        m = Bare()
+        self.assertIsNone(m.id)
+        self.assertIsNone(m.score)
+
+    def test_default_hash_key(self):
+        """ Constructor can set hash key """
+        m = Bare('a')
+        self.assertEqual(m.id, 'a')
+        self.assertIsNone(m.score)
+
+    def test_default_range_key(self):
+        """ Constructor can set range key """
+        m = Bare('a', 5)
+        self.assertEqual(m.id, 'a')
+        self.assertEqual(m.score, 5)
+
+    def test_constructor_kwargs(self):
+        """ Can set any parameter with constructor kwargs """
+        m = Bare(foo='bar')
+        self.assertEqual(m.foo, 'bar')
+
+    def test_too_many_args(self):
+        """ Too many positional arguments to constructor raises error """
+        with self.assertRaises(TypeError):
+            Bare('a', 4, 5)
+
+    def test_refresh_no_engine(self):
+        """ Calling refresh() before model touches engine raises error """
+        m = Bare('a', 1)
+        with self.assertRaises(ValueError):
+            m.refresh()
+
+    def test_sync_no_engine(self):
+        """ Calling sync() before model touches engine raises error """
+        m = Bare('a', 1)
+        with self.assertRaises(ValueError):
+            m.sync()
+
+    def test_delete_no_engine(self):
+        """ Calling delete() before model touches engine raises error """
+        m = Bare('a', 1)
+        with self.assertRaises(ValueError):
+            m.delete()
+
+    def test_json(self):
+        """ Model has default JSON serialization method """
+        m = Bare('a', 1, foo='bar')
+        js = m.__json__()
+        self.assertEqual(js, {
+            'id': 'a',
+            'score': 1,
+            'foo': 'bar',
+        })
+
+    def test_equality(self):
+        """ Models have default equality method using primary key """
+        m1 = Bare('a', 1)
+        m2 = Bare('a', 1, foo='bar')
+        self.assertEqual(m1, m2)
+        self.assertEqual(hash(m1), hash(m2))
+
+    def test_inequality(self):
+        """ Models have default equality method using primary key """
+        m1 = Bare('a', 1)
+        m2 = Bare('a', 2)
+        self.assertNotEqual(m1, m2)
+        self.assertNotEqual(hash(m1), hash(m2))
