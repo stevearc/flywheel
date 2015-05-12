@@ -545,7 +545,8 @@ class Engine(object):
                 elif field.is_mutable:
                     cached_var = item.cached_(name)
                     if field.resolve(item) != cached_var:
-                        item.__dirty__.add(name)
+                        for related in item.meta_.related_fields[name]:
+                            item.__dirty__.add(related)
 
             if not item.__dirty__ and not item.__incrs__:
                 refresh_models.append(item)

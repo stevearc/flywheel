@@ -253,6 +253,7 @@ class TestModelMutation(DynamoSystemTest):
             p = Post('a', 'b', 4)
             self.engine.save(p)
             p.foobar = set('a')
+            p.ts = 4
             p.points = Decimal('2')
             p.sync(raise_on_conflict=False)
             self.assertEqual(len(captured_updates), 2)
@@ -591,6 +592,29 @@ class TestModelMutation(DynamoSystemTest):
         p.add_(tags='a')
         self.assertEqual(p.tags, set(['a']))
 
+    def test_dirty_requires_change(self):
+        """ Don't mark fields dirty if the value hasn't changed """
+        p = Post('a', 'b', 0)
+        p.about = 'foobar'
+        p.tags = set(['foo'])
+        self.engine.save(p)
+        p.about = 'foobar'
+        p.tags = set(['foo'])
+        self.assertEqual(p.__dirty__, set())
+
+    def test_set_add_conflict(self):
+        """ This is less a test and more documenting bad behavior """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        # TODO: Right now if you add() and add_() to a set, the add()'s will be
+        # ignored. It would be nice to at least provide a warning, but
+        # preferably an error, when this happens.
+        p.tags.add('foo')
+        p.add_(tags='bar')
+        p.sync()
+        ret = self.engine.scan(Post).one()
+        self.assertEqual(ret.tags, set(['bar']))
+
     def test_no_add_string(self):
         """ Cannot add_ to string fields """
         p = Post('a', 'b', 0)
@@ -611,10 +635,11 @@ class TestModelMutation(DynamoSystemTest):
 
     def test_no_add_and_set(self):
         """ Cannot both add_ to a set and set the value in same update """
+        # Note that this behavior is only working on overflow fields ATM
         p = Post('a', 'b', 0)
-        p.tags = set(['a'])
+        p.foobars = set(['a'])
         with self.assertRaises(ValueError):
-            p.add_(tags='b')
+            p.add_(foobars='b')
 
     def test_remove_from_set_presync(self):
         """ Removing from a set should update local model value """
