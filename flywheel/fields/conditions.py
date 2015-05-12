@@ -1,6 +1,8 @@
 """ Query constraints """
 import six
 
+FILTER_ONLY = set(['contains', 'ncontains', 'null', 'in', 'ne'])
+
 
 class Condition(object):
 
@@ -39,17 +41,15 @@ class Condition(object):
 
     def query_kwargs(self, model):
         """ Get the kwargs for doing a table query """
-        scan_only = set(['contains', 'ncontains', 'null', 'in', 'ne'])
-        for op, _ in six.itervalues(self.fields):
-            if op in scan_only:
-                raise ValueError("Operation '%s' cannot be used in a query!" %
-                                 op)
         if self.index_name is not None:
             ordering = model.meta_.get_ordering_from_index(self.index_name)
         else:
+            queryable_keys = [k for k, (op, _) in six.iteritems(self.fields)
+                              if op not in FILTER_ONLY]
             ordering = model.meta_.get_ordering_from_fields(
                 self.eq_fields.keys(),
-                self.fields.keys())
+                queryable_keys,
+            )
 
         if ordering is None:
             raise ValueError("Bad query arguments. You must provide a hash "

@@ -3,10 +3,11 @@ import six
 import time
 
 import inspect
-from dynamo3 import DynamoKey, LocalIndex, GlobalIndex, Throughput
+from dynamo3 import DynamoKey, Throughput
 from collections import defaultdict
 
 from .fields import Field
+from .fields.conditions import FILTER_ONLY
 
 
 class ValidationError(Exception):
@@ -50,6 +51,8 @@ class Ordering(object):
             else:
                 for field in self.range_key.can_resolve(fields):
                     (op, val) = fields[field]
+                    if op in FILTER_ONLY:
+                        continue
                     kwargs['%s__%s' % (field, op)] = val
                     remaining.remove(field)
 
