@@ -534,14 +534,15 @@ class Engine(object):
         for item in items:
             # Look for any mutable fields (e.g. sets) that have changed
             for name in item.keys_():
+                if name in item.__dirty__ or name in item.__incrs__:
+                    continue
                 field = item.meta_.fields.get(name)
                 if field is None:
                     value = item.get_(name)
                     if Field.is_overflow_mutable(value):
                         if value != item.cached_(name):
                             item.__dirty__.add(name)
-                elif (field.is_mutable and name not in item.__dirty__ and
-                        name not in item.__incrs__):
+                elif field.is_mutable:
                     cached_var = item.cached_(name)
                     if field.resolve(item) != cached_var:
                         item.__dirty__.add(name)
