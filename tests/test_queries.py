@@ -17,6 +17,8 @@ class User(Model):
     name = Field(range_key=True)
     score = Field(data_type=NUMBER, index='score-index', default=0)
     str_set = Field(data_type=STRING_SET)
+    bio = Field()
+    plan = Field()
 
 
 def score_merge(ts, upvotes):
@@ -317,35 +319,35 @@ class TestQueries(DynamoSystemTest):
 
     def test_filter_non_indexed(self):
         """ Queries can filter non-indexed fields """
-        u = User(id='a', name='Adam', foo='bar')
-        u2 = User(id='a', name='Billy', foo='baz')
+        u = User(id='a', name='Adam', bio='bar')
+        u2 = User(id='a', name='Billy', bio='baz')
         self.engine.save([u, u2])
 
         results = self.engine.query(User).filter(User.id == 'a')\
-            .filter(foo='bar').all()
+            .filter(bio='bar').all()
         self.assertEquals(results, [u])
 
     def test_filter_or(self):
         """ Queries can join filter constraints with OR """
-        u = User(id='a', name='Adam', foo='bar')
-        u2 = User(id='a', name='Billy', bar='baz')
-        u3 = User(id='a', name='Celine', foo='not', bar='this')
+        u = User(id='a', name='Adam', bio='bar')
+        u2 = User(id='a', name='Billy', plan='baz')
+        u3 = User(id='a', name='Celine', bio='not', plan='this')
         self.engine.save([u, u2, u3])
 
         results = self.engine.query(User).filter(User.id == 'a')\
-            .filter(foo='bar', bar='baz').all(filter_or=True)
+            .filter(bio='bar', plan='baz').all(filter_or=True)
         self.assertEqual(len(results), 2)
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
 
     def test_filter_inequality(self):
         """ Queries can use inequality filters on non-indexed fields """
-        u = User(id='a', name='Adam', foo=0)
-        u2 = User(id='a', name='Billy', foo=2)
+        u = User(id='a', name='Adam', bio='aaa')
+        u2 = User(id='a', name='Billy', bio='zzz')
         self.engine.save([u, u2])
 
         results = self.engine.query(User).filter(User.id == 'a')\
-            .filter(User.field_('foo') < 2).all()
+            .filter(User.bio < 'ddd').all()
         self.assertEquals(results, [u])
 
 

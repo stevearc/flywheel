@@ -72,7 +72,6 @@ class Field(object):
         self.name = None
         self.model = None
         self.composite = False
-        self.overflow = False
         if isinstance(data_type, TypeDefinition):
             self.data_type = data_type
         elif (inspect.isclass(data_type) and
@@ -224,49 +223,12 @@ class Field(object):
         """ Dump a value to format for use in a Dynamo query """
         if value is None:
             return None
-        if self.overflow:
-            return self.ddb_dump_overflow(value)
         value = self.coerce(value, force_coerce=True)
         return self.ddb_dump(value)
 
     def ddb_load(self, val):
         """ Decode a value retrieved from Dynamo """
         return self.data_type.ddb_load(val)
-
-    @classmethod
-    def ddb_dump_overflow(cls, val):
-        """ Dump an overflow value to its Dynamo format """
-        if val is None:
-            return None
-        elif isinstance(val, six.integer_types) or isinstance(val, float):
-            return val
-        elif isinstance(val, set):
-            return val
-        else:
-            return json.dumps(val)
-
-    @classmethod
-    def ddb_load_overflow(cls, val):
-        """ Decode a value of an overflow field """
-        if (isinstance(val, Decimal) or isinstance(val, float) or
-                isinstance(val, six.integer_types)):
-            if val % 1 == 0:
-                return int(val)
-            return float(val)
-        elif isinstance(val, set):
-            return val
-        else:
-            return json.loads(val)
-
-    @classmethod
-    def is_overflow_mutable(cls, val):
-        """ Check if an overflow field is mutable """
-        if val is None:
-            return False
-        val_type = type(val)
-        if val_type in ALL_TYPES:
-            return ALL_TYPES[val_type].mutable
-        return True
 
     @property
     def ddb_data_type(self):
@@ -333,9 +295,6 @@ class Field(object):
             # Don't bother checking allowed filters because this turns into the
             # "exists" filter, which can be done on anything
             pass
-        elif self.overflow:
-            # Don't bother checking validity if this is an overflow field
-            pass
         elif filter not in self.data_type.allowed_filters:
             raise TypeError("Cannot use '%s' filter on '%s' field" %
                             (filter, self.data_type))
@@ -361,7 +320,7 @@ class Field(object):
 
     def _make_contains_condition(self, filter, other):
         """ Construct a query condition for 'contains' or 'ncontains' """
-        if not self.overflow and filter not in self.data_type.allowed_filters:
+        if filter not in self.data_type.allowed_filters:
             raise TypeError("Cannot use '%s' filter on '%s' field" %
                             (filter, self.data_type))
         return Condition.construct(self.name, filter,
@@ -380,9 +339,7 @@ class Field(object):
         Create a query condition that this field must be within a set of values
 
         """
-        if self.overflow:
-            other = set([self.ddb_dump_overflow(val) for val in other])
-        elif 'in' not in self.data_type.allowed_filters:
+        if 'in' not in self.data_type.allowed_filters:
             raise TypeError("Cannot use '%s' filter on '%s' field" %
                             (filter, self.data_type))
         else:
@@ -394,16 +351,10 @@ class Field(object):
         Create a query condition that this field must begin with a string
 
         """
-        if (not self.overflow and
-                'beginswith' not in self.data_type.allowed_filters):
+        if 'beginswith' not in self.data_type.allowed_filters:
             raise TypeError("Cannot use 'beginswith' filter on '%s' field" %
                             self.data_type)
-        if self.overflow:
-            # Since strings are dumped to json in overflow fields, we should
-            # prefix it with a double quote
-            other = '"' + other
-        else:
-            other = self.ddb_dump_for_query(other)
+        other = self.ddb_dump_for_query(other)
         return Condition.construct(self.name, 'beginswith', other)
 
     def between_(self, low, high):
@@ -412,8 +363,7 @@ class Field(object):
         (inclusive)
 
         """
-        if (not self.overflow and
-                'between' not in self.data_type.allowed_filters):
+        if 'between' not in self.data_type.allowed_filters:
             raise TypeError("Cannot use 'between' filter on %s field" %
                             self.data_type)
         low = self.ddb_dump_for_query(low)

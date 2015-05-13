@@ -418,72 +418,6 @@ class TestFields(DynamoSystemTest):
         stored_widget = self.engine.scan(Widget).all()[0]
         self.assertEquals(w.str_set, stored_widget.str_set)
 
-    def test_store_extra_number(self):
-        """ Extra number fields are stored as numbers """
-        w = Widget(string='a', foobar=5)
-        self.engine.sync(w)
-
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertEquals(result['foobar'], 5)
-        stored_widget = self.engine.scan(Widget).all()[0]
-        self.assertEquals(stored_widget.foobar, 5)
-
-    def test_store_extra_string(self):
-        """ Extra string fields are stored as json strings """
-        w = Widget(string='a', foobar='hi')
-        self.engine.sync(w)
-
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertEquals(result['foobar'], json.dumps('hi'))
-        stored_widget = self.engine.scan(Widget).all()[0]
-        self.assertEquals(stored_widget.foobar, 'hi')
-
-    def test_store_extra_set(self):
-        """ Extra set fields are stored as sets """
-        foobar = set(['hi'])
-        w = Widget(string='a', foobar=foobar)
-        self.engine.sync(w)
-
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertEquals(result['foobar'], foobar)
-        stored_widget = self.engine.scan(Widget).all()[0]
-        self.assertEquals(stored_widget.foobar, foobar)
-
-    def test_store_extra_dict(self):
-        """ Extra dict fields are stored as json strings """
-        foobar = {'foo': 'bar'}
-        w = Widget(string='a', foobar=foobar)
-        self.engine.save(w)
-
-        tablename = Widget.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertEquals(result['foobar'], json.dumps(foobar))
-        stored_widget = self.engine.scan(Widget).all()[0]
-        self.assertEquals(stored_widget.foobar, foobar)
-
-    def test_convert_overflow_int(self):
-        """ Should convert overflow ints from Decimal when loading """
-        w = Widget(string='a')
-        w.foobar = 1
-        self.engine.save(w)
-
-        fetched = self.engine.scan(Widget).first()
-        self.assertEqual(fetched.foobar, 1)
-        self.assertTrue(isinstance(fetched.foobar, int))
-
-    def test_convert_overflow_float(self):
-        """ Should convert overflow floats from Decimal when loading """
-        w = Widget(string='a')
-        w.foobar = 1.3
-        self.engine.save(w)
-
-        fetched = self.engine.scan(Widget).first()
-        self.assertEqual(fetched.foobar, 1.3)
-        self.assertTrue(isinstance(fetched.foobar, float))
-
     def test_dict_updates(self):
         """ Dicts track changes and update during sync() """
         w = Widget(string='a')
@@ -503,36 +437,6 @@ class TestFields(DynamoSystemTest):
         w.sync()
         stored_widget = self.engine.scan(Widget).first()
         self.assertEquals(stored_widget.data_list, ['a'])
-
-    def test_overflow_set_updates(self):
-        """ Overflow sets track changes and update during sync() """
-        w = Widget(string='a')
-        w.myset = set(['a'])
-        self.engine.save(w)
-        w.myset.add('b')
-        w.sync()
-        stored_widget = self.engine.scan(Widget).first()
-        self.assertEquals(stored_widget.myset, set(['a', 'b']))
-
-    def test_overflow_dict_updates(self):
-        """ Overflow dicts track changes and update during sync() """
-        w = Widget(string='a')
-        w.mydict = {'a': 'b'}
-        self.engine.save(w)
-        w.mydict['c'] = 'd'
-        w.sync()
-        stored_widget = self.engine.scan(Widget).first()
-        self.assertEquals(stored_widget.mydict, {'a': 'b', 'c': 'd'})
-
-    def test_overflow_list_updates(self):
-        """ Overflow lists track changes and update during sync() """
-        w = Widget(string='a')
-        w.mylist = ['a']
-        self.engine.save(w)
-        w.mylist.append('b')
-        w.sync()
-        stored_widget = self.engine.scan(Widget).first()
-        self.assertEquals(stored_widget.mylist, ['a', 'b'])
 
     def test_empty_set_save(self):
         """ Models can initialize an empty set and saving will work fine """
