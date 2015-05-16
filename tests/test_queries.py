@@ -235,54 +235,54 @@ class TestQueries(DynamoSystemTest):
         self.assertEquals(results, [u])
 
     def test_filter_ne(self):
-        """ Queries cannot filter ne """
+        """ Queries can filter ne """
         u = User(id='a', name='Adam')
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
 
-        with self.assertRaises(ValueError):
-            self.engine.query(User).filter(User.id == 'a')\
-                .filter(User.name != 'Adam').all()
+        ret = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.name != 'Adam').one()
+        self.assertEqual(ret, u2)
 
     def test_filter_in(self):
-        """ Queries cannot filter in """
+        """ Queries can filter in """
         u = User(id='a', name='Adam')
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
 
-        with self.assertRaises(ValueError):
-            self.engine.query(User).filter(User.id == 'a')\
-                .filter(User.name.in_(set())).all()
+        ret = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.name.in_(set(['Adam']))).one()
+        self.assertEqual(ret, u)
 
     def test_filter_contains(self):
-        """ Queries cannot filter contains """
-        u = User(id='a', name='Adam')
-        u2 = User(id='a', name='Aaron')
+        """ Queries can filter contains """
+        u = User(id='a', name='Adam', str_set=set(['foo', 'bar']))
+        u2 = User(id='a', name='Aaron', str_set=set(['bar']))
         self.engine.save([u, u2])
 
-        with self.assertRaises(ValueError):
-            self.engine.query(User).filter(User.id == 'a')\
-                .filter(User.str_set.contains_('hi')).all()
+        ret = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.str_set.contains_('foo')).one()
+        self.assertEqual(ret, u)
 
     def test_filter_null(self):
-        """ Queries cannot filter null """
-        u = User(id='a', name='Adam')
+        """ Queries can filter null """
+        u = User(id='a', name='Adam', str_set=set(['foo']))
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
 
-        with self.assertRaises(ValueError):
-            self.engine.query(User).filter(User.id == 'a')\
-                .filter(User.name == None).all()  # noqa
+        ret = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.str_set == None).one()  # noqa
+        self.assertEqual(ret, u2)
 
     def test_filter_not_null(self):
-        """ Queries cannot filter not null """
-        u = User(id='a', name='Adam')
+        """ Queries can filter not null """
+        u = User(id='a', name='Adam', str_set=set(['foo']))
         u2 = User(id='a', name='Aaron')
         self.engine.save([u, u2])
 
-        with self.assertRaises(ValueError):
-            self.engine.query(User).filter(User.id == 'a')\
-                .filter(User.name != None).all()  # noqa
+        ret = self.engine.query(User).filter(User.id == 'a')\
+            .filter(User.str_set != None).one()  # noqa
+        self.assertEqual(ret, u)
 
     def test_smart_local_index(self):
         """ Queries auto-select local secondary index """

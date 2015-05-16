@@ -261,6 +261,8 @@ class Field(object):
     @classmethod
     def is_overflow_mutable(cls, val):
         """ Check if an overflow field is mutable """
+        if val is None:
+            return False
         val_type = type(val)
         if val_type in ALL_TYPES:
             return ALL_TYPES[val_type].mutable

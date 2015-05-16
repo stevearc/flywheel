@@ -8,4 +8,4 @@ from .models import Model
 from .engine import Engine
 from .query import DuplicateEntityException, EntityNotFoundException
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'

@@ -1,5 +1,13 @@
 Changelog
 =========
+
+0.4.2
+-----
+* Make the ``dict``, ``list``, and ``bool`` types backwards-compatible with the old json-serialized format (:pr:`24`)
+* Allow queries to use ``in``, ``not null``, and a few other constraints that were missing (:sha:`8b8854d`)
+* Models are smarter about marking fields as dirty for sync (:issue:`26`)
+* Stopped using deprecated ``expected`` syntax for dynamo3
+
 0.4.1
 -----
 * **Warning**: Stored datetime objects will now be timezone-aware (:sha:`a7c253d`)

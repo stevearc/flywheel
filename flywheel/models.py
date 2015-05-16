@@ -10,6 +10,8 @@ from .model_meta import ModelMetaclass, ModelMetadata, Ordering
 
 # pylint: disable=E1002
 
+SENTINEL = object()
+
 
 class SetDelta(object):
 
@@ -195,19 +197,27 @@ class Model(six.with_metaclass(ModelMetaclass)):
                     return
         field = self.meta_.fields.get(name)
         if field is not None:
-            self.mark_dirty_(name)
             # Ignore if trying to set a composite field
-            if not field.composite:
-                if (not self._loading and self.persisted_ and
-                        name not in self.__cache__):
-                    for related in self.meta_.related_fields[name]:
-                        cached_var = copy.copy(getattr(self, related))
-                        self.__cache__[related] = cached_var
-                super(Model, self).__setattr__(name, field.coerce(value))
+            if field.composite:
+                return
+            # Mutable fields check if they're dirty during sync()
+            if field.is_mutable:
+                return super(Model, self).__setattr__(name, field.coerce(value))
+
+            # Don't mark the field dirty if the new and old values are the same
+            oldv = getattr(self, name, SENTINEL)
+            if not self._loading and oldv is not SENTINEL and oldv == value:
+                return
+            self.mark_dirty_(name)
+            if (not self._loading and self.persisted_ and
+                    name not in self.__cache__):
+                for related in self.meta_.related_fields[name]:
+                    cached_var = copy.copy(getattr(self, related))
+                    self.__cache__[related] = cached_var
+            return super(Model, self).__setattr__(name, field.coerce(value))
         elif name.startswith('_') or name.endswith('_'):
             # Don't interfere with non-Field private attrs
-            super(Model, self).__setattr__(name, value)
-            return
+            return super(Model, self).__setattr__(name, value)
         else:
             self.mark_dirty_(name)
             if (not self._loading and self.persisted_ and name not in
@@ -456,7 +466,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Construct a dynamo "expects" mapping based on the cached fields """
         if fields is None:
             fields = self.keys_()
-        return dict(((name, self.ddb_dump_cached_(name)) for name in fields))
+        expect = {}
+        for name in fields:
+            val = self.ddb_dump_cached_(name)
+            if val is None:
+                expect[name + '__null'] = True
+            else:
+                expect[name + '__eq'] = val
+        return expect
 
     @classmethod
     def field_(cls, name):

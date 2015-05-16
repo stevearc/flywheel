@@ -402,7 +402,7 @@ class Engine(object):
                     expected = item.construct_ddb_expects_()
                     count += 1
                     self.dynamo.delete_item(tablename, item.pk_dict_,
-                                            expected=expected)
+                                            **expected)
             else:
                 with self.dynamo.batch_write(tablename) as batch:
                     for item in items:
@@ -534,17 +534,19 @@ class Engine(object):
         for item in items:
             # Look for any mutable fields (e.g. sets) that have changed
             for name in item.keys_():
+                if name in item.__dirty__ or name in item.__incrs__:
+                    continue
                 field = item.meta_.fields.get(name)
                 if field is None:
                     value = item.get_(name)
                     if Field.is_overflow_mutable(value):
                         if value != item.cached_(name):
                             item.__dirty__.add(name)
-                elif (field.is_mutable and name not in item.__dirty__ and
-                        name not in item.__incrs__):
+                elif field.is_mutable:
                     cached_var = item.cached_(name)
                     if field.resolve(item) != cached_var:
-                        item.__dirty__.add(name)
+                        for related in item.meta_.related_fields[name]:
+                            item.__dirty__.add(related)
 
             if not item.__dirty__ and not item.__incrs__:
                 refresh_models.append(item)
@@ -578,7 +580,7 @@ class Engine(object):
                 value = getattr(item, name)
                 kwargs = {}
                 if _raise_on_conflict and name not in constrained_fields:
-                    kwargs['expected'] = item.ddb_dump_cached_(name)
+                    kwargs = {'eq': item.ddb_dump_cached_(name)}
                 update = ItemUpdate.put(name, item.ddb_dump_field_(name),
                                         **kwargs)
                 updates.append(update)
