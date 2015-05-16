@@ -466,7 +466,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Construct a dynamo "expects" mapping based on the cached fields """
         if fields is None:
             fields = self.keys_()
-        return dict(((name, self.ddb_dump_cached_(name)) for name in fields))
+        expect = {}
+        for name in fields:
+            val = self.ddb_dump_cached_(name)
+            if val is None:
+                expect[name + '__null'] = True
+            else:
+                expect[name + '__eq'] = val
+        return expect
 
     @classmethod
     def field_(cls, name):

@@ -402,7 +402,7 @@ class Engine(object):
                     expected = item.construct_ddb_expects_()
                     count += 1
                     self.dynamo.delete_item(tablename, item.pk_dict_,
-                                            expected=expected)
+                                            **expected)
             else:
                 with self.dynamo.batch_write(tablename) as batch:
                     for item in items:
@@ -580,7 +580,7 @@ class Engine(object):
                 value = getattr(item, name)
                 kwargs = {}
                 if _raise_on_conflict and name not in constrained_fields:
-                    kwargs['expected'] = item.ddb_dump_cached_(name)
+                    kwargs = {'eq': item.ddb_dump_cached_(name)}
                 update = ItemUpdate.put(name, item.ddb_dump_field_(name),
                                         **kwargs)
                 updates.append(update)
