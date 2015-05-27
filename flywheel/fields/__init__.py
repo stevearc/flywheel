@@ -309,6 +309,13 @@ class Field(object):
         else:
             return scope[self.name]
 
+    def get_cached_value(self, obj):
+        """ Get the cached value of a field before any local modifications """
+        if self.name in obj.__cache__:
+            return obj.__cache__[self.name]
+        else:
+            return self.resolve(obj)
+
     def _make_condition(self, filter, other):
         """
         Construct a query condition for a filter on a value
@@ -472,5 +479,10 @@ class Composite(Field):
         if scope is not None and self.name in scope:
             return super(Composite, self).resolve(obj, scope)
         args = [self.model.meta_.fields[f].resolve(obj, scope) for f in
+                self.subfields]
+        return self.coerce(self.merge(*args))
+
+    def get_cached_value(self, obj):
+        args = [self.model.meta_.fields[f].get_cached_value(obj) for f in
                 self.subfields]
         return self.coerce(self.merge(*args))
