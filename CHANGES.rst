@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.4.3
+-----
+* Bug fix: Incorrect ``ConditionalCheckFailedException`` when syncing changes to a Composite field.
+* Allow ``DateTimeType`` to be stored as a naive datetime.
+
 0.4.2
 -----
 * Make the ``dict``, ``list``, and ``bool`` types backwards-compatible with the old json-serialized format (:pr:`24`)
