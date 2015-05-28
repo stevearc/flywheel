@@ -5,12 +5,11 @@ from datetime import datetime, date
 
 import json
 from decimal import Decimal
-from flywheel.fields.types import DictType, register_type
+from flywheel.fields.types import DictType, register_type, DateTimeType, UTC
 
 from flywheel import (Field, Composite, Model, NUMBER, BINARY, STRING_SET,
                       NUMBER_SET, BINARY_SET, Binary, GlobalIndex, set_)
 from flywheel.tests import DynamoSystemTest
-from flywheel.fields.types import UTC
 
 
 try:
@@ -67,6 +66,7 @@ class Widget(Model):
     not_null = Field(data_type=int, nullable=False, default=0)
     not_null_natural = Field(data_type=int, check=lambda x: x != 1,
                              nullable=False, default=0)
+    comp = Composite('str_set', data_type=int, merge=len)
 
     def __init__(self, **kwargs):
         kwargs.setdefault('string', 'abc')
@@ -302,6 +302,18 @@ class TestFieldCoerce(unittest.TestCase):
         field = Field(data_type=frozenset([date]))
         self.assertEqual(field.data_type.item_type, date)
 
+    def test_naive_datetime(self):
+        """ Naive datetime fields don't add timezone """
+        field = Field(data_type=DateTimeType(naive=True))
+        dt = field.ddb_load(1432828089.027812)
+        self.assertIsNone(dt.tzinfo)
+
+    def test_datetime_tz(self):
+        """ Normal datetime fields add UTC timezone """
+        field = Field(data_type=datetime)
+        dt = field.ddb_load(1432828089.027812)
+        self.assertEqual(dt.tzinfo, UTC)
+
 
 class TestFields(DynamoSystemTest):
 
@@ -373,6 +385,7 @@ class TestFields(DynamoSystemTest):
             'natural_num': 1,
             'not_null': 0,
             'not_null_natural': 0,
+            'comp': 0,
         })
 
     def test_set_updates(self):

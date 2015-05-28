@@ -307,6 +307,10 @@ class Model(six.with_metaclass(ModelMetaclass)):
             return default
         if name in self.__cache__:
             return self.__cache__[name]
+        field = self.meta_.fields.get(name)
+        # Need this redirection for Composite fields
+        if field is not None:
+            return field.get_cached_value(self)
         return getattr(self, name, default)
 
     def incr_(self, **kwargs):

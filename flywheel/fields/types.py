@@ -451,9 +451,33 @@ UTC = UTCTimezone()
 
 class DateTimeType(TypeDefinition):
 
-    """ Datetimes, stored as a unix timestamp """
+    """
+    Datetimes, stored as a unix timestamp
+
+    Parameters
+    ----------
+    naive : bool, optional
+        If True, will load values from Dynamo with no timezone. If False, will
+        add a UTC timezone. (Default False).
+
+    Notes
+    -----
+    If you want to use naive datetimes, you will need to reference the type
+    class directly instead of going through an alias. For example:
+
+    .. code-block:: python
+
+        from flywheel.fields.types import DateTimeType
+
+        field = Field(data_type=DateTimeType(naive=True))
+
+    """
     data_type = datetime.datetime
     ddb_data_type = NUMBER
+
+    def __init__(self, naive=False):
+        super(DateTimeType, self).__init__()
+        self.naive = naive
 
     def ddb_dump(self, value):
         seconds = calendar.timegm(value.utctimetuple())
@@ -461,10 +485,13 @@ class DateTimeType(TypeDefinition):
         return Decimal("%d.%s" % (seconds, milliseconds))
 
     def ddb_load(self, value):
-        microseconds = 1000000 * (value - int(value))
-        return datetime.datetime.utcfromtimestamp(value) \
-            .replace(tzinfo=UTC) \
+        microseconds = int(1000000 * (value - int(value)))
+        dt = datetime.datetime.utcfromtimestamp(value) \
             .replace(microsecond=microseconds)
+        if self.naive:
+            return dt
+        else:
+            return dt.replace(tzinfo=UTC)
 
 register_type(DateTimeType)
 
