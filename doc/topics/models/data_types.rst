@@ -31,7 +31,7 @@ special notes. For more information, the code for data types is located in
 
 
 +----------+----------+-------------+---------------------------------------------------------------+
-| PY2 Type | PY3 Type | Dynamo Type | Description                                                   |
+| PY2 Type | PY3 Type | Dynamo Type | Notes                                                         |
 +==========+==========+=============+===============================================================+
 | unicode  | str      | STRING      | Basic STRING type. This is the default for fields             |
 +----------+----------+-------------+---------------------------------------------------------------+
@@ -47,9 +47,10 @@ special notes. For more information, the code for data types is located in
 +----------+----------+-------------+---------------------------------------------------------------+
 | bool     |          | BOOL        |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
-| datetime |          | NUMBER      | datetimes will be treated as naïve. UTC recommended.          |
+| datetime |          | NUMBER      | Stored with UTC timezone. See                                 |
+|          |          |             | :class:`~flywheel.fields.types.DateTimeType` for more.        |
 +----------+----------+-------------+---------------------------------------------------------------+
-| date     |          | NUMBER      | dates will be treated as naïve. UTC recommended.              |
+| date     |          | NUMBER      |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
 | dict     |          | MAP         |                                                               |
 +----------+----------+-------------+---------------------------------------------------------------+
