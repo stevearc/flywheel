@@ -548,20 +548,9 @@ class Engine(object):
             fields = item.__dirty__
             item.pre_save_(self)
 
-            # If the model has changed any field that is part of a composite
-            # field, FORCE the sync to raise on conflict. This prevents the
-            # composite key from potentially getting into an inconsistent state
-            _raise_on_conflict = raise_on_conflict
-            for name in itertools.chain(item.__incrs__, fields):
-                for related_name in item.meta_.related_fields.get(name, []):
-                    field = item.meta_.fields[related_name]
-                    if field.composite:
-                        _raise_on_conflict = True
-                        break
-
             keywords = {}
             constrained_fields = set()
-            if _raise_on_conflict and constraints is not None:
+            if raise_on_conflict and constraints is not None:
                 for constraint in constraints:
                     constrained_fields.update(constraint.eq_fields.keys())
                     constrained_fields.update(constraint.fields.keys())
@@ -573,7 +562,7 @@ class Engine(object):
                 field = item.meta_.fields.get(name)
                 value = getattr(item, name)
                 kwargs = {}
-                if _raise_on_conflict and name not in constrained_fields:
+                if raise_on_conflict and name not in constrained_fields:
                     kwargs = {'eq': item.ddb_dump_cached_(name)}
                 update = ItemUpdate.put(name, item.ddb_dump_field_(name),
                                         **kwargs)
