@@ -1,4 +1,5 @@
 """ Field declarations for models """
+import copy
 import six
 import inspect
 import json
@@ -101,13 +102,18 @@ class Field(object):
         self._ddb_index_kwargs = None
         if default is NO_ARG:
             if self.is_set:
-                self.default = set()
+                self._default = set()
             else:
-                self.default = None
+                self._default = None
         else:
-            self.default = default
+            self._default = default
         if index:
             self.all_index(index)
+
+    @property
+    def default(self):
+        """ Get a shallow copy of the default value """
+        return copy.copy(self._default)
 
     def get_ddb_index(self):
         """ Construct a dynamo local index object """
