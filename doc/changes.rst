@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.4
+-----
+* Bug fix: Mutable field defaults are no longer shared among model instances
+
 0.4.3
 -----
 * Bug fix: Incorrect ``ConditionalCheckFailedException`` when syncing changes to a Composite field.
