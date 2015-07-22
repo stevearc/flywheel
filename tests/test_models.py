@@ -12,6 +12,7 @@ try:
     import unittest2 as unittest  # pylint: disable=F0401
 except ImportError:
     import unittest
+# pylint: disable=E1101
 
 
 class Widget(Model):
@@ -715,6 +716,28 @@ class TestModelMutation(DynamoSystemTest):
         a._foobar = 'foobar'
         del a._foobar
         self.assertFalse(hasattr(a, '_foobar'))
+
+
+class SetModel(Model):
+
+    """ Test model with set """
+    id = Field(hash_key=True)
+    items = Field(data_type=set)
+
+
+class TestDefaults(DynamoSystemTest):
+
+    """ Test field defaults """
+    models = [SetModel]
+
+    def test_copy_mutable_field_default(self):
+        """ Model fields should not share any mutable field defaults """
+        m1 = SetModel('a')
+        m1.items.add('foo')
+        self.engine.save(m1)
+        m2 = SetModel('b')
+        self.assertTrue(m2.items is not m1.items)
+        self.assertEqual(m2.items, set())
 
 
 class Store(Model):
