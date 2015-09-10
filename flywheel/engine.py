@@ -495,7 +495,8 @@ class Engine(object):
                     for key, val in data.items():
                         item.set_ddb_val_(key, val)
 
-    def sync(self, items, raise_on_conflict=None, consistent=False, constraints=None):
+    def sync(self, items, raise_on_conflict=None, consistent=False,
+             constraints=None, no_read=False):
         """
         Sync model changes back to database
 
@@ -517,11 +518,14 @@ class Engine(object):
             List of more complex constraints that must pass for the update to
             complete. Must be used with raise_on_conflict=True. Format is the
             same as query filters (e.g. Model.fieldname > 5)
+        no_read : bool, optional
+            If True, don't perform a GET on models with no changes. (default False)
 
         Raises
         ------
         exc : :class:`dynamo3.CheckFailed`
-            If raise_on_conflict=True and the model changed underneath us
+            If raise_on_conflict=True and the data in dynamo fails the
+            contraint checks.
 
         """
         if raise_on_conflict is None:
@@ -600,4 +604,5 @@ class Engine(object):
                 except CheckFailed:
                     pass
         # Refresh item data
-        self.refresh(refresh_models, consistent=consistent)
+        if not no_read:
+            self.refresh(refresh_models, consistent=consistent)

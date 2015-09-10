@@ -646,6 +646,26 @@ class TestModelMutation(DynamoSystemTest):
         del a._foobar
         self.assertFalse(hasattr(a, '_foobar'))
 
+    def test_sync_refresh(self):
+        """ Syncing a model with no changes will refresh the data """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        self.engine.sync(a2)
+        a.sync()
+        self.assertEqual(a.text, 'bar')
+
+    def test_sync_no_read(self):
+        """ Sync(no_read=True) performs a write and no reads """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        self.engine.sync(a2)
+        a.sync(no_read=True)
+        self.assertEqual(a.text, 'foo')
+
 
 class Store(Model):
 

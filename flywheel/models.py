@@ -143,19 +143,18 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
         self.__engine__.refresh(self, consistent=consistent)
 
-    def sync(self, raise_on_conflict=None, constraints=None):
+    def sync(self, *args, **kwargs):
         """ Sync model changes back to database """
         if self.__engine__ is None:
             raise ValueError("Cannot sync: No DB connection")
 
-        self.__engine__.sync(self, raise_on_conflict=raise_on_conflict,
-                             constraints=constraints)
+        self.__engine__.sync(self, *args, **kwargs)
 
-    def delete(self, raise_on_conflict=None):
+    def delete(self, *args, **kwargs):
         """ Delete the model from the database """
         if self.__engine__ is None:
             raise ValueError("Cannot delete: No DB connection")
-        self.__engine__.delete(self, raise_on_conflict=raise_on_conflict)
+        self.__engine__.delete(self, *args, **kwargs)
 
     @classmethod
     def __on_create__(cls):
