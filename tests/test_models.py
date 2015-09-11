@@ -320,6 +320,20 @@ class TestModelMutation(DynamoSystemTest):
         p2.refresh()
         self.assertEquals(p2.ts, p.ts)
 
+    def test_refresh_missing(self):
+        """ Refreshing a set of models should work even if one is missing """
+        p1 = Post('a', 'b', 4)
+        p2 = Post('a', 'c', 5)
+        p3 = Post('a', 'd', 6)
+        self.engine.save([p1, p2])
+        self.engine.refresh([p1, p2, p3])
+        self.assertEqual(p1.id, 'b')
+        self.assertEqual(p2.id, 'c')
+        self.assertEqual(p3.id, 'd')
+        self.assertEqual(p1.ts, 4)
+        self.assertEqual(p2.ts, 5)
+        self.assertEqual(p3.ts, 6)
+
     def test_sync_blank(self):
         """ Sync creates item even if only primary key is set """
         a = Article()

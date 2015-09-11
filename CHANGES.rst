@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.5
+-----
+* Bug fix: Calling refresh() on an unsaved model no longer crashes.
+
 0.4.4
 -----
 * Bug fix: Mutable field defaults are no longer shared among model instances

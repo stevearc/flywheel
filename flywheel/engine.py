@@ -486,14 +486,33 @@ class Engine(object):
         for item in items:
             tables[item.meta_.ddb_tablename(self.namespace)].append(item)
 
+        def primary_key_equals(model, data):
+            """ Helper function to check equality of primary keys """
+            for key, val in six.iteritems(model.pk_dict_):
+                if data.get(key) != val:
+                    return False
+            return True
+
         for tablename, items in six.iteritems(tables):
             keys = [item.pk_dict_ for item in items]
             results = self.dynamo.batch_get(tablename, keys,
                                             consistent=consistent)
-            for item, data in izip(items, results):
-                with item.loading_(self):
-                    for key, val in data.items():
-                        item.set_ddb_val_(key, val)
+            item_iter = iter(items)
+            result_iter = iter(results)
+            # We get the results back in order, but it's possible for some of
+            # the models to not have rows in DynamoDB. If that is the case, we
+            # need to skip them when iterating over the results.
+            try:
+                while True:
+                    result = next(result_iter)
+                    item = next(item_iter)
+                    while not primary_key_equals(item, result):
+                        item = next(item_iter)
+                    with item.loading_(self):
+                        for key, val in six.iteritems(result):
+                            item.set_ddb_val_(key, val)
+            except StopIteration:
+                pass
 
     def sync(self, items, raise_on_conflict=None, consistent=False, constraints=None):
         """
