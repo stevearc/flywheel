@@ -136,7 +136,7 @@ class Engine(object):
 
     def connect_to_region(self, region, **kwargs):
         """ Connect to an AWS region """
-        self.dynamo = DynamoDBConnection.connect_to_region(region, **kwargs)
+        self.dynamo = DynamoDBConnection.connect(region, **kwargs)
 
     def connect_to_host(self, **kwargs):
         """ Connect to a specific host """
