@@ -1,6 +1,6 @@
 Flywheel
 ========
-:Master Build: |build|_ |coverage|_
+:Build: |build|_ |coverage|_
 :Documentation: http://flywheel.readthedocs.org/
 :Downloads: http://pypi.python.org/pypi/flywheel
 :Source: https://github.com/mathcamp/flywheel
@@ -17,6 +17,7 @@ Getting Started
 This is what a basic model looks like (schema taken from this `DynamoDB
 API documentation
 <http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html>`_)
+
 ::
 
     from flywheel import Model, Field, GlobalIndex
@@ -38,29 +39,39 @@ API documentation
             self.title = title
             self.userid = userid
 
-Create a new top score::
+Create a new top score
+
+::
 
     >>> score = GameScore('Master Blaster', 'abc')
     >>> score.top_score = 9001
     >>> score.top_score_time = datetime.utcnow()
     >>> engine.sync(score)
 
-Get all top scores for a user::
+Get all top scores for a user
+
+::
 
     >>> scores = engine.query(GameScore).filter(userid='abc').all()
 
-Get the top score for Galaxy Invaders::
+Get the top score for Galaxy Invaders
+
+::
 
     >>> top_score = engine.query(GameScore).filter(title='Galaxy Invaders')\
     ...     .first(desc=True)
 
-Atomically increment a user's "wins" count on Alien Adventure::
+Atomically increment a user's "wins" count on Alien Adventure
+
+::
 
     >>> score = GameScore('Alien Adventure', 'abc')
     >>> score.incr_(wins=1)
     >>> engine.sync(score)
 
-Get all scores on Comet Quest that are over 9000::
+Get all scores on Comet Quest that are over 9000
+
+::
 
     >>> scores = engine.query(GameScore).filter(GameScore.top_score > 9000,
     ...                                         title='Comet Quest').all()

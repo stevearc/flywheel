@@ -3,7 +3,7 @@ Changelog
 
 0.4.5
 -----
-* Bug fix: Calling refresh() on an unsaved model no longer crashes.
+* Bug fix: Calling refresh() could sometimes crash from unordered results.
 
 0.4.4
 -----
