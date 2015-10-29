@@ -293,6 +293,11 @@ class Model(six.with_metaclass(ModelMetaclass)):
         return self.meta_.pk_dict(self, ddb_dump=True)
 
     @property
+    def pk_tuple_(self):
+        """ The primary key dict, encoded for dynamo """
+        return self.meta_.pk_tuple(self, ddb_dump=True)
+
+    @property
     def persisted_(self):
         """ True if the model exists in DynamoDB, False otherwise """
         return self._persisted

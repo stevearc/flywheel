@@ -282,7 +282,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync with constraints fails if raise_on_conflict is False """
         p = Post('a', 'b', 4)
         with self.assertRaises(ValueError):
-            self.engine.sync(p, raise_on_conflict=False, constraints=[Post.ts < 5])
+            self.engine.sync(p, raise_on_conflict=False,
+                             constraints=[Post.ts < 5])
 
     def test_delete(self):
         """ Model can delete itself """
@@ -319,6 +320,24 @@ class TestModelMutation(DynamoSystemTest):
         p.sync()
         p2.refresh()
         self.assertEquals(p2.ts, p.ts)
+
+    def test_refresh_multiple_models(self):
+        """ Can refresh multiple model types """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p2.ts = 10
+        p2.sync()
+
+        a = Article(text='unfortunately')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'obviously'
+        a2.sync()
+
+        self.engine.refresh([a, p])
+        self.assertEquals(p.ts, p2.ts)
+        self.assertEquals(a.text, a2.text)
 
     def test_refresh_missing(self):
         """ Refreshing a set of models should work even if one is missing """
@@ -946,3 +965,22 @@ class TestModelDefaults(unittest.TestCase):
         m2 = Bare('a', 2)
         self.assertNotEqual(m1, m2)
         self.assertNotEqual(hash(m1), hash(m2))
+
+
+class FloatModel(Model):
+    """ Test model with floats in the primary key """
+    hkey = Field(data_type=int, hash_key=True)
+    rkey = Field(data_type=float, range_key=True)
+
+
+class TestRefresh(DynamoSystemTest):
+
+    """ Test model refresh """
+    models = [FloatModel]
+
+    def test_refresh_floating_point(self):
+        """ Refresh with floats should not cause problems """
+        p = FloatModel(4, 4.2932982983292)
+        self.engine.save(p)
+        p.refresh()
+        # If there is a floating point mismatch, an error will be raised by now

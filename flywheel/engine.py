@@ -1,14 +1,17 @@
 """ Query engine """
 import itertools
-from collections import defaultdict
 
+import logging
 import six
+from collections import defaultdict
 from dynamo3 import DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW
-from six.moves import zip as izip  # pylint: disable=F0401
 
 from .fields import Field
 from .models import Model, SetDelta
 from .query import Query, Scan
+
+
+LOG = logging.getLogger(__name__)
 
 
 class Engine(object):
@@ -141,6 +144,10 @@ class Engine(object):
     def connect_to_host(self, **kwargs):
         """ Connect to a specific host """
         self.dynamo = DynamoDBConnection.connect_to_host(**kwargs)
+
+    def connect(self, *args, **kwargs):
+        """ Connect to a specific host """
+        self.dynamo = DynamoDBConnection.connect(*args, **kwargs)
 
     def register(self, *models):
         """
@@ -483,36 +490,27 @@ class Engine(object):
             return
 
         tables = defaultdict(list)
+        model_map = defaultdict(dict)
         for item in items:
-            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
-
-        def primary_key_equals(model, data):
-            """ Helper function to check equality of primary keys """
-            for key, val in six.iteritems(model.pk_dict_):
-                if data.get(key) != val:
-                    return False
-            return True
+            tablename = item.meta_.ddb_tablename(self.namespace)
+            tables[tablename].append(item)
+            model_map[tablename][item.pk_tuple_] = item
 
         for tablename, items in six.iteritems(tables):
             keys = [item.pk_dict_ for item in items]
             results = self.dynamo.batch_get(tablename, keys,
                                             consistent=consistent)
-            item_iter = iter(items)
-            result_iter = iter(results)
-            # We get the results back in order, but it's possible for some of
-            # the models to not have rows in DynamoDB. If that is the case, we
-            # need to skip them when iterating over the results.
-            try:
-                while True:
-                    result = next(result_iter)
-                    item = next(item_iter)
-                    while not primary_key_equals(item, result):
-                        item = next(item_iter)
-                    with item.loading_(self):
-                        for key, val in six.iteritems(result):
-                            item.set_ddb_val_(key, val)
-            except StopIteration:
-                pass
+            meta = items[0].meta_
+            for result in results:
+                pkey = meta.pk_tuple(None, result, ddb_load=True)
+                item = model_map[tablename].get(pkey)
+                if item is None:
+                    LOG.error("Refresh error: Cannot match primary key %r to "
+                              "a model", pkey)
+                    continue
+                with item.loading_(self):
+                    for key, val in six.iteritems(result):
+                        item.set_ddb_val_(key, val)
 
     def sync(self, items, raise_on_conflict=None, consistent=False, constraints=None):
         """

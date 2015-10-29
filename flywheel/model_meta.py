@@ -311,6 +311,22 @@ class ModelMetadata(object):
         """ Construct the primary key value """
         return self.hash_key.resolve(obj, scope)
 
+    def pk_tuple(self, obj=None, scope=None, ddb_dump=False, ddb_load=False):
+        """ Get a tuple that represents the primary key for an item """
+        hk = self.hk(obj, scope)
+        if ddb_dump:
+            hk = self.hash_key.ddb_dump(hk)
+        elif ddb_load:
+            hk = self.hash_key.ddb_load(hk)
+        if self.range_key is None:
+            return (hk,)
+        rk = self.rk(obj, scope)
+        if ddb_dump:
+            rk = self.range_key.ddb_dump(rk)
+        elif ddb_load:
+            rk = self.range_key.ddb_load(rk)
+        return (hk, rk)
+
     def pk_dict(self, obj=None, scope=None, ddb_dump=False):
         """ Get the dynamo primary key dict for an item """
         # If we can unambiguously tell that a single string defines the primary
