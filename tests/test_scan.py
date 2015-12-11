@@ -9,6 +9,8 @@ from .test_queries import User
 from flywheel import Model, Field, Limit
 from flywheel.tests import DynamoSystemTest
 
+# pylint: disable=C0121
+
 
 class TestScan(DynamoSystemTest):
 

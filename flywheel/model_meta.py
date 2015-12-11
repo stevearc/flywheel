@@ -169,8 +169,10 @@ class ModelMetadata(object):
         self._abstract = False
         self.__dict__.update(model.__metadata__)
         # Allow throughput to be specified as read/write in a dict
+        # pylint: disable=E1134
         if isinstance(self.throughput, dict):
             self.throughput = Throughput(**self.throughput)
+        # pylint: enable=E1134
         self.name = self._name
         self.fields = {}
         self.hash_key = None
