@@ -14,7 +14,7 @@ CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
 REQUIREMENTS = [
-    'dynamo3>=0.4.0',
+    'dynamo3>=0.4.6',
     'six'
 ]
 
