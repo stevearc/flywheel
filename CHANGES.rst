@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.6
+-----
+* Pass exclusive_start_key through to dynamo3
+
 0.4.5
 -----
 * Bug fix: Calling refresh() could sometimes crash from unordered results.

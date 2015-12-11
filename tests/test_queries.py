@@ -4,6 +4,8 @@ from flywheel import (Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex,
                       DuplicateEntityException, EntityNotFoundException)
 from flywheel.tests import DynamoSystemTest
 
+# pylint: disable=C0121
+
 
 class User(Model):
 

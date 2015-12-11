@@ -45,7 +45,7 @@ class Query(object):
         return self.model.meta_.ddb_tablename(self.engine.namespace)
 
     def gen(self, desc=False, consistent=False, attributes=None,
-            filter_or=False):
+            filter_or=False, exclusive_start_key=None):
         """
         Return the query results as a generator
 
@@ -61,6 +61,8 @@ class Query(object):
         filter_or : bool, optional
             If True, multiple filter() constraints will be joined with an OR
             (default AND).
+        exclusive_start_key : dict, optional
+            The ExclusiveStartKey to resume a previous query
 
         Returns
         -------
@@ -70,9 +72,10 @@ class Query(object):
         kwargs = self.condition.query_kwargs(self.model)
         if attributes is not None:
             kwargs['attributes'] = attributes
-        results = self.dynamo.query(self.tablename, desc=desc,
-                                    consistent=consistent, filter_or=filter_or,
-                                    **kwargs)
+        results = self.dynamo.query(
+            self.tablename, desc=desc, consistent=consistent,
+            filter_or=filter_or, exclusive_start_key=exclusive_start_key,
+            **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
@@ -83,7 +86,7 @@ class Query(object):
         return self.gen()
 
     def all(self, desc=False, consistent=False, attributes=None,
-            filter_or=False):
+            filter_or=False, exclusive_start_key=None):
         """
         Return the query results as a list
 
@@ -99,6 +102,8 @@ class Query(object):
         filter_or : bool, optional
             If True, multiple filter() constraints will be joined with an OR
             (default AND).
+        exclusive_start_key : dict, optional
+            The ExclusiveStartKey to resume a previous query
 
         Returns
         -------
@@ -106,7 +111,8 @@ class Query(object):
 
         """
         return list(self.gen(desc=desc, consistent=consistent,
-                             attributes=attributes, filter_or=filter_or))
+                             attributes=attributes, filter_or=filter_or,
+                             exclusive_start_key=exclusive_start_key))
 
     def count(self, filter_or=False):
         """
@@ -276,7 +282,7 @@ class Scan(Query):
     """
 
     def gen(self, attributes=None, desc=False, consistent=False,
-            filter_or=False):
+            filter_or=False, exclusive_start_key=None):
         if desc:
             raise ValueError("Cannot order scan() results")
         if consistent:
@@ -285,8 +291,9 @@ class Scan(Query):
 
         if attributes is not None:
             kwargs['attributes'] = attributes
-        results = self.dynamo.scan(self.tablename, filter_or=filter_or,
-                                   **kwargs)
+        results = self.dynamo.scan(
+            self.tablename, filter_or=filter_or,
+            exclusive_start_key=exclusive_start_key, **kwargs)
         for result in results:
             if attributes is not None:
                 yield result
