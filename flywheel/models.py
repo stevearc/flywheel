@@ -292,6 +292,10 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ The primary key dict, encoded for dynamo """
         return self.meta_.pk_dict(self, ddb_dump=True)
 
+    def index_pk_dict_(self, index_name):
+        """ The primary key dict for an index, encoded for dynamo """
+        return self.meta_.index_pk_dict(self, ddb_dump=True)
+
     @property
     def pk_tuple_(self):
         """ The primary key dict, encoded for dynamo """
