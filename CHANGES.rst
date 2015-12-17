@@ -1,9 +1,13 @@
 Changelog
 =========
 
+0.4.7
+-----
+* New ``index_pk_dict_`` method for constructing `exclusive_start_key` for index queries (:issue:`34`)
+
 0.4.6
 -----
-* Pass exclusive_start_key through to dynamo3
+* Pass exclusive_start_key through to dynamo3 (:issue:`34`)
 
 0.4.5
 -----

@@ -68,6 +68,25 @@ class Ordering(object):
 
         return kwargs
 
+    def pk_dict(self, obj=None, scope=None, ddb_dump=False):
+        """ Get the dynamo primary key dict for this ordering """
+        # If we can unambiguously tell that a single string defines the primary
+        # key, allow scope to be a single string
+        if (obj is None and isinstance(scope, six.string_types) and
+                self.range_key is None):
+            scope = {self.hash_key.name: scope}
+
+        hk = self.hash_key.resolve(obj, scope)
+        if ddb_dump:
+            hk = self.hash_key.ddb_dump(hk)
+        key_dict = {self.hash_key.name: hk}
+        if self.range_key is not None:
+            rk = self.range_key.resolve(obj, scope)
+            if ddb_dump:
+                rk = self.range_key.ddb_dump(rk)
+            key_dict[self.range_key.name] = rk
+        return key_dict
+
     def __repr__(self):
         if self.range_key is None:
             return "Ordering(%s, None, %s)" % (self.hash_key.name,
@@ -331,22 +350,17 @@ class ModelMetadata(object):
 
     def pk_dict(self, obj=None, scope=None, ddb_dump=False):
         """ Get the dynamo primary key dict for an item """
-        # If we can unambiguously tell that a single string defines the primary
-        # key, allow scope to be a single string
-        if (obj is None and isinstance(scope, six.string_types) and
-                self.range_key is None):
-            scope = {self.hash_key.name: scope}
+        return self.index_pk_dict(None, obj, scope, ddb_dump)
 
-        hk = self.hk(obj, scope)
-        if ddb_dump:
-            hk = self.hash_key.ddb_dump(hk)
-        rk = self.rk(obj, scope)
-        key_dict = {self.hash_key.name: hk}
-        if rk is not None:
-            if ddb_dump:
-                rk = self.range_key.ddb_dump(rk)
-            key_dict[self.range_key.name] = rk
-        return key_dict
+    def index_pk_dict(self, index_name, obj=None, scope=None, ddb_dump=False):
+        """ Get the primary key dict for an index (includes the table key) """
+        # Get the 'table' index, which is the hash & range key
+        table_order = self.get_ordering_from_index(None)
+        pk = table_order.pk_dict(obj, scope, ddb_dump)
+        if index_name is not None:
+            ordering = self.get_ordering_from_index(index_name)
+            pk.update(ordering.pk_dict(obj, scope, ddb_dump))
+        return pk
 
     @property
     def abstract(self):

@@ -1,7 +1,7 @@
 """ Tests for engine queries """
-from six.moves import xrange as _xrange  # pylint: disable=F0401
+import six
 from flywheel import (Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex,
-                      DuplicateEntityException, EntityNotFoundException)
+                      DuplicateEntityException, EntityNotFoundException, Limit)
 from flywheel.tests import DynamoSystemTest
 
 # pylint: disable=C0121
@@ -350,6 +350,37 @@ class TestQueries(DynamoSystemTest):
             .filter(User.field_('foo') < 2).all()
         self.assertEquals(results, [u])
 
+    def test_limit_and_resume(self):
+        """ Query can provide a limit and resume later """
+        users = [User('a', 'a', score=1), User('a', 'b', score=2), User('a', 'c', score=2)]
+        self.engine.save(users)
+        limit = Limit(item_limit=1, strict=True)
+        results = self.engine.query(User).filter(id='a') \
+            .filter(User.score > 0).limit(limit).all()
+        self.assertEqual(len(results), 1)
+
+        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 2)
+
+        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+
+        # We should have seen all the items by this point
+        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+        # This fails in python 2.6
+        if six.PY3:
+            self.assertItemsEqual(results, users)
+
 
 class TestCompositeQueries(DynamoSystemTest):
 
@@ -460,7 +491,7 @@ class TestOrder(DynamoSystemTest):
 
     def _add_widgets(self):
         """ Add a bunch of widgets with different alpha/beta values """
-        for i in _xrange(10):
+        for i in range(10):
             w = Widget('a', str(i), alpha=i)
             w.beta = (i + 5) % 10
             self.engine.save(w)
