@@ -294,7 +294,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
     def index_pk_dict_(self, index_name):
         """ The primary key dict for an index, encoded for dynamo """
-        return self.meta_.index_pk_dict(self, ddb_dump=True)
+        return self.meta_.index_pk_dict(index_name, self, ddb_dump=True)
 
     @property
     def pk_tuple_(self):

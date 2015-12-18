@@ -359,20 +359,20 @@ class TestQueries(DynamoSystemTest):
             .filter(User.score > 0).limit(limit).all()
         self.assertEqual(len(results), 1)
 
-        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
         results.extend(self.engine.query(User).filter(id='a')
                        .filter(User.score > 0).limit(limit).all(
                            exclusive_start_key=last_evaluated_key))
         self.assertEqual(len(results), 2)
 
-        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
         results.extend(self.engine.query(User).filter(id='a')
                        .filter(User.score > 0).limit(limit).all(
                            exclusive_start_key=last_evaluated_key))
         self.assertEqual(len(results), 3)
 
         # We should have seen all the items by this point
-        last_evaluated_key = User.meta_.index_pk_dict('score-index', results[-1])
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
         results.extend(self.engine.query(User).filter(id='a')
                        .filter(User.score > 0).limit(limit).all(
                            exclusive_start_key=last_evaluated_key))
