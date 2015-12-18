@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.8
+-----
+* Bug fix: Bad function call in ``index_pk_dict_``
+
 0.4.7
 -----
 * New ``index_pk_dict_`` method for constructing `exclusive_start_key` for index queries (:issue:`34`)

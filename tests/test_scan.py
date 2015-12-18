@@ -193,18 +193,18 @@ class TestScan(DynamoSystemTest):
         results = self.engine.scan(User).limit(limit).all()
         self.assertEqual(len(results), 1)
 
-        last_evaluated_key = User.meta_.pk_dict(results[-1])
+        last_evaluated_key = results[-1].pk_dict_
         results.extend(self.engine.scan(User).limit(limit).all(
             exclusive_start_key=last_evaluated_key))
         self.assertEqual(len(results), 2)
 
-        last_evaluated_key = User.meta_.pk_dict(results[-1])
+        last_evaluated_key = results[-1].pk_dict_
         results.extend(self.engine.scan(User).limit(limit).all(
             exclusive_start_key=last_evaluated_key))
         self.assertEqual(len(results), 3)
 
         # We should have seen all the items by this point
-        last_evaluated_key = User.meta_.pk_dict(results[-1])
+        last_evaluated_key = results[-1].pk_dict_
         results.extend(self.engine.scan(User).limit(limit).all(
             exclusive_start_key=last_evaluated_key))
         self.assertEqual(len(results), 3)
