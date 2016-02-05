@@ -10,12 +10,49 @@ from dynamo3 import ItemUpdate
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
 from flywheel.fields.types import UTC
+from flywheel.models import SENTINEL, sentinel_compare
 from flywheel.tests import DynamoSystemTest
 try:
     import unittest2 as unittest  # pylint: disable=F0401
 except ImportError:
     import unittest
 # pylint: disable=E1101
+
+
+class SentinelCompare(unittest.TestCase):
+    """Test sentinel_compare."""
+
+    def test_simple_true(self):
+        """Equal things means True."""
+
+        self.assertTrue(sentinel_compare(True, True))
+
+    def test_simple_false(self):
+        """Different things means False."""
+
+        self.assertFalse(sentinel_compare(False, True))
+
+    def test_sentinels(self):
+        """Sentinel anywhere means False."""
+
+        self.assertFalse(sentinel_compare(SENTINEL, True))
+        self.assertFalse(sentinel_compare(True, SENTINEL))
+        self.assertFalse(sentinel_compare(SENTINEL, SENTINEL))
+
+    def test_blowup(self):
+        """Exploding things means False."""
+
+        class Kaboomer(object):
+            """Something that always explodes when compared."""
+
+            def __eq__(self, other):
+                raise Exception("Kaboom!")
+
+        kaboom = Kaboomer()
+
+        self.assertFalse(sentinel_compare(kaboom, True))
+        self.assertFalse(sentinel_compare(True, kaboom))
+        self.assertFalse(sentinel_compare(kaboom, kaboom))
 
 
 class Widget(Model):
@@ -637,6 +674,21 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(p)
         p.about = 'foobar'
         p.tags = set(['foo'])
+        self.assertEqual(p.__dirty__, set())
+
+    def test_dirty_can_be_cleared(self):
+        """ Unmark fields dirty if the value is restored """
+        p = Post('a', 'b', 0)
+        self.engine.save(p)
+        old_about = p.about
+        old_tags = p.tags
+
+        p.about = 'foobar'
+        p.tags = set(['foo'])
+        self.assertEqual(p.__dirty__, set(['about', 'c_all', 'keywords']))
+
+        p.about = old_about
+        p.tags = old_tags
         self.assertEqual(p.__dirty__, set())
 
     def test_set_add_conflict(self):

@@ -13,6 +13,22 @@ from .model_meta import ModelMetaclass, ModelMetadata, Ordering
 SENTINEL = object()
 
 
+def sentinel_compare(obj1, obj2):
+    """Compare two objects safely.
+
+    Consider SENTINEL different from everything. Consider raising exception as
+    a Falsy result.
+    """
+
+    if any(o is SENTINEL for o in (obj1, obj2)):
+        return False
+
+    try:
+        return obj1 == obj2
+    except Exception:
+        return False
+
+
 class SetDelta(object):
 
     """
@@ -205,11 +221,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
                 return super(Model, self).__setattr__(name, field.coerce(value))
 
             # Don't mark the field dirty if the new and old values are the same
-            oldv = getattr(self, name, SENTINEL)
-            try:
-                same_value = oldv is not SENTINEL and oldv == value
-            except Exception:
-                same_value = False
+            same_value = sentinel_compare(getattr(self, name, SENTINEL), value)
             if not self._loading and same_value:
                 return
             self.mark_dirty_(name)
@@ -218,7 +230,19 @@ class Model(six.with_metaclass(ModelMetaclass)):
                 for related in self.meta_.related_fields[name]:
                     cached_var = copy.copy(getattr(self, related))
                     self.__cache__[related] = cached_var
-            return super(Model, self).__setattr__(name, field.coerce(value))
+
+            result = super(Model, self).__setattr__(name, field.coerce(value))
+
+            if not self._loading and self.persisted_:
+                for related in self.meta_.related_fields[name]:
+                    if sentinel_compare(
+                            self.__cache__.get(related, SENTINEL),
+                            getattr(self, related),
+                    ):
+                        del self.__cache__[related]
+                        self.__dirty__.remove(related)
+
+            return result
         elif name.startswith('_') or name.endswith('_'):
             # Don't interfere with non-Field private attrs
             return super(Model, self).__setattr__(name, value)
