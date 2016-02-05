@@ -1,12 +1,15 @@
 """ Tests for models """
 import six
+import sys
 import json
+from datetime import datetime
 from decimal import Decimal
 from mock import patch, ANY
 from dynamo3 import ItemUpdate
 
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
+from flywheel.fields.types import UTC
 from flywheel.tests import DynamoSystemTest
 try:
     import unittest2 as unittest  # pylint: disable=F0401
@@ -984,3 +987,43 @@ class TestRefresh(DynamoSystemTest):
         self.engine.save(p)
         p.refresh()
         # If there is a floating point mismatch, an error will be raised by now
+
+
+class DatetimeModel(Model):
+    """ Just something with a field that can raise when comparing """
+    hkey = Field(data_type=int, hash_key=True)
+    field = Field(data_type=datetime)
+
+
+class ExplodingComparisons(DynamoSystemTest):
+
+    """Make sure all comparisons are dealt with gracefully.
+
+    This came up when comparing datetime objects with different TZ awareness,
+    but applies to all error raises."""
+
+    models = [DatetimeModel]
+
+    def setUp(self):
+        super(ExplodingComparisons, self).setUp()
+
+        self.o = DatetimeModel(1, field=datetime.utcnow())
+        self.engine.save(self.o)
+
+    def test_ok(self):
+        """ Happy case """
+        self.o.field = datetime.utcnow()  # Same TZ awareness, should not raise.
+
+    # Comaparing datetimes with == on 3.3 onwards doesn't raise.
+    if sys.version_info[:2] < (3, 3):
+        def test_kaboom(self):
+            """ Sad case """
+            now = datetime.utcnow().replace(tzinfo=UTC)
+
+            # Prove to ourselves this explodes.
+            with self.assertRaises(TypeError):
+                # Because pylint was confused about not doing anything with the
+                # =='s result
+                bool(self.o.field == now)
+
+            self.o.field = now

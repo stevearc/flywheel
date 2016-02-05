@@ -206,7 +206,11 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
             # Don't mark the field dirty if the new and old values are the same
             oldv = getattr(self, name, SENTINEL)
-            if not self._loading and oldv is not SENTINEL and oldv == value:
+            try:
+                same_value = oldv is not SENTINEL and oldv == value
+            except Exception:
+                same_value = False
+            if not self._loading and same_value:
                 return
             self.mark_dirty_(name)
             if (not self._loading and self.persisted_ and
