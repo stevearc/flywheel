@@ -613,3 +613,14 @@ class TestEngine(DynamoSystemTest):
     def test_delete_key_empty(self):
         """ No error if deleting no keys """
         self.engine.delete_key(SingleKeyModel, [])
+
+    def test_model_save(self):
+        """ Save can overwrite item data """
+        p = Post(type='tweet', id='1234', username='foo')
+        self.engine.save(p)
+
+        p.username = 'bar'
+        p.save(overwrite=True)
+
+        ret = self.engine.get(Post, uid='tweet:1234', score=0)
+        self.assertEqual(ret.username, 'bar')

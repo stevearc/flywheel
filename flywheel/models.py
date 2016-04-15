@@ -138,9 +138,16 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def refresh(self, consistent=False):
         """ Overwrite model data with freshest from database """
         if self.__engine__ is None:
-            raise ValueError("Cannot sync: No DB connection")
+            raise ValueError("Cannot refresh: No DB connection")
 
         self.__engine__.refresh(self, consistent=consistent)
+
+    def save(self, overwrite=None):
+        """ Save model data to database (see also: sync) """
+        if self.__engine__ is None:
+            raise ValueError("Cannot save: No DB connection")
+
+        self.__engine__.save(self, overwrite=overwrite)
 
     def sync(self, raise_on_conflict=None, constraints=None):
         """ Sync model changes back to database """
