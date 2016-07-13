@@ -4,7 +4,8 @@ import itertools
 import logging
 import six
 from collections import defaultdict
-from dynamo3 import DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW
+from dynamo3 import (DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW,
+                     UPDATED_NEW)
 
 from .fields import Field
 from .models import Model, SetDelta
@@ -12,6 +13,8 @@ from .query import Query, Scan
 
 
 LOG = logging.getLogger(__name__)
+
+NO_ARG = object()
 
 
 class Engine(object):
@@ -635,3 +638,58 @@ class Engine(object):
                     pass
         # Refresh item data
         self.refresh(refresh_models, consistent=consistent)
+
+    def update_field(self, item, name, value=NO_ARG, action=ItemUpdate.PUT,
+                     constraints=None):
+        """
+        Update the value of a single field
+
+        Note that this method bypasses field validators and will ignore any
+        special behavior around Composite fields.
+
+        Parameters
+        ----------
+        item : :class:`~flywheel.models.Model`
+            The model to update
+        name : str
+            The name of the field to update
+        value : object, optional
+            The new value for the field. Default will use the value currently
+            on the model.
+        action : str, optional
+            PUT, ADD, or DELETE. (default PUT)
+        constraints : list, optional
+            List of constraints that must pass for the update to complete.
+            Format is the same as query filters (e.g. Model.fieldname > 5)
+
+        """
+        if value is NO_ARG:
+            if action == ItemUpdate.DELETE:
+                value = None
+            elif action == ItemUpdate.ADD:
+                raise ValueError("Must specify a value when using the "
+                                 "actions ADD or DELETE")
+            else:
+                value = getattr(item, name)
+
+        keywords = {}
+        if constraints is not None:
+            for constraint in constraints:
+                keywords.update(constraint.scan_kwargs())
+
+        updates = [
+            ItemUpdate(action, name, item.field_(name).ddb_dump_for_query(value))
+        ]
+
+        ret = self.dynamo.update_item(
+            item.meta_.ddb_tablename(self.namespace), item.pk_dict_,
+            updates, returns=UPDATED_NEW, **keywords)
+        with item.partial_loading_():
+            for key, val in six.iteritems(ret):
+                item.set_ddb_val_(key, val)
+            # If we didn't see the field in the response,
+            # it must have been deleted.
+            if name not in ret:
+                item.set_ddb_val_(name, None)
+
+        item.post_save_fields_(set([name]))

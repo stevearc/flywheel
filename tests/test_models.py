@@ -754,6 +754,96 @@ class TestModelMutation(DynamoSystemTest):
         self.assertFalse(hasattr(a, '_foobar'))
 
 
+class TestUpdateField(DynamoSystemTest):
+
+    """ Tests for engine.update_field """
+    models = [Article]
+
+    def test_update_field_default_value(self):
+        """ update_field: Omitting value will use current model value """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        self.engine.update_field(a, 'text')
+        self.assertEqual(a.text, 'foobar')
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_value(self):
+        """ update_field: Can pass in value to set """
+        a = Article()
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', 'foo')
+        self.assertEqual(a.text, 'foo')
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_delete(self):
+        """ update_field: Passing in None will delete the field """
+        a = Article(text='foobar')
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', None)
+        self.assertEqual(a.text, None)
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_clean(self):
+        """ update_field: Remove from dirty afterwards """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        self.assertIn('text', a.__dirty__)
+        self.engine.update_field(a, 'text')
+        self.assertNotIn('text', a.__dirty__)
+
+    def test_update_field_limit_clean(self):
+        """ update_field: Prior unrelated dirty fields stay dirty """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        a.views = 5
+        self.assertIn('views', a.__dirty__)
+        self.engine.update_field(a, 'text')
+        self.assertIn('views', a.__dirty__)
+
+    def test_update_field_constraints(self):
+        """ update_field: Can pass in constraints """
+        a = Article()
+        self.engine.save(a)
+        with self.assertRaises(ConditionalCheckFailedException):
+            self.engine.update_field(a, 'text', 'foobar', constraints=[Article.views > 2])
+
+    def test_update_field_add(self):
+        """ update_field: Can perform an atomic add instead of a put """
+        a = Article()
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        self.engine.update_field(a, 'views', 1, action='ADD')
+        self.engine.update_field(a2, 'views', 2, action='ADD')
+        ret = self.engine.scan(Article).first()
+        self.assertEqual(ret.views, 3)
+
+    def test_update_field_delete_action(self):
+        """ update_field: Can perform an atomic delete instead of a put """
+        a = Article(text='foobar')
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', action='DELETE')
+        self.assertIsNone(a.text)
+        result = self.engine.scan(Article).first()
+        self.assertEqual(result.text, a.text)
+
+    def test_update_field_no_eq(self):
+        """ update_field: No default equality constraint """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        a2.sync()
+        self.engine.update_field(a, 'text', 'baz')
+        ret = self.engine.scan(Article).first()
+        self.assertEqual(ret.text, 'baz')
+
+
 class SetModel(Model):
 
     """ Test model with set """
