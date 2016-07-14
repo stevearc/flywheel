@@ -52,7 +52,7 @@ Changelog
 * Feature: Fields support multiple validation checks
 * Feature: Fields have an easy way to enforce non-null values (``nullable=False``)
 
-Data type changes are due to an `update in the DynamoDB API
+Data type changes are due to `an update in the DynamoDB API
 <https://aws.amazon.com/blogs/aws/dynamodb-update-json-and-more/>`_
 
 0.3.0
