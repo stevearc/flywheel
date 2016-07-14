@@ -19,6 +19,7 @@ class User(Model):
     name = Field(range_key=True)
     score = Field(data_type=NUMBER, index='score-index', default=0)
     str_set = Field(data_type=STRING_SET)
+    alias = Field()
 
 
 def score_merge(ts, upvotes):
@@ -238,22 +239,22 @@ class TestQueries(DynamoSystemTest):
 
     def test_filter_ne(self):
         """ Queries can filter ne """
-        u = User(id='a', name='Adam')
-        u2 = User(id='a', name='Aaron')
+        u = User(id='a', name='Adam', alias="A")
+        u2 = User(id='a', name='Aaron', alias="a-aron")
         self.engine.save([u, u2])
 
         ret = self.engine.query(User).filter(User.id == 'a')\
-            .filter(User.name != 'Adam').one()
+            .filter(User.alias != "A").one()
         self.assertEqual(ret, u2)
 
     def test_filter_in(self):
         """ Queries can filter in """
-        u = User(id='a', name='Adam')
-        u2 = User(id='a', name='Aaron')
+        u = User(id='a', name='Adam', alias='A')
+        u2 = User(id='a', name='Aaron', alias='a-aron')
         self.engine.save([u, u2])
 
         ret = self.engine.query(User).filter(User.id == 'a')\
-            .filter(User.name.in_(set(['Adam']))).one()
+            .filter(User.alias.in_(set(['A', 'b']))).one()
         self.assertEqual(ret, u)
 
     def test_filter_contains(self):
