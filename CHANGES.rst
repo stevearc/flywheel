@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.4.9
+-----
+* Feature: Add ``save()`` method to Models (:issue:`40`)
+* Feature: Add ``update_field()`` method to Engine (:issue:`43`)
+
 0.4.8
 -----
 * Bug fix: Bad function call in ``index_pk_dict_``
