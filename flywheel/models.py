@@ -138,9 +138,16 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def refresh(self, consistent=False):
         """ Overwrite model data with freshest from database """
         if self.__engine__ is None:
-            raise ValueError("Cannot sync: No DB connection")
+            raise ValueError("Cannot refresh: No DB connection")
 
         self.__engine__.refresh(self, consistent=consistent)
+
+    def save(self, overwrite=None):
+        """ Save model data to database (see also: sync) """
+        if self.__engine__ is None:
+            raise ValueError("Cannot save: No DB connection")
+
+        self.__engine__.save(self, overwrite=overwrite)
 
     def sync(self, raise_on_conflict=None, constraints=None):
         """ Sync model changes back to database """
@@ -398,6 +405,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
         for field in six.itervalues(self.meta_.fields):
             field.validate(self)
 
+    def post_save_fields_(self, fields):
+        """ Called after update_field or update_fields """
+        self.__dirty__.difference_update(fields)
+        for name in fields:
+            self.__incrs__.pop(name, None)
+            if name in self.__cache__:
+                self.__cache__[name] = copy.copy(getattr(self, name))
+
     def post_save_(self):
         """ Called after item is saved to database """
         self._persisted = True
@@ -434,6 +449,13 @@ class Model(six.with_metaclass(ModelMetaclass)):
         yield
         self._loading = False
         self.post_load_(engine)
+
+    @contextlib.contextmanager
+    def partial_loading_(self):
+        """ For use when loading a partial object (i.e. from update_field) """
+        self._loading = True
+        yield
+        self._loading = False
 
     def ddb_dump_field_(self, name):
         """ Dump a field to a Dynamo-friendly value """
@@ -495,12 +517,15 @@ class Model(six.with_metaclass(ModelMetaclass)):
     @classmethod
     def field_(cls, name):
         """
-        Construct a placeholder Field for an undeclared field
+        Get Field or construct a placeholder for an undeclared field
 
         This is used for creating scan filter constraints on fields that were
         not declared in the model
 
         """
+        field = cls.meta_.fields.get(name)
+        if field is not None:
+            return field
         field = Field()
         field.name = name
         field.overflow = True
