@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.10
+------
+* Feature: Add ``exists()`` method to Engine (:issue:`45`)
+
 0.4.9
 -----
 * Feature: Add ``save()`` method to Models (:issue:`40`)
