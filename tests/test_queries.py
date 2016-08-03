@@ -533,7 +533,7 @@ class SingleKeyModel(Model):
 class TestEngine(DynamoSystemTest):
 
     """ Tests for misc engine functionality """
-    models = [Post, SingleKeyModel]
+    models = [Post, SingleKeyModel, Widget]
 
     def test_get(self):
         """ Fetch item directly by primary key """
@@ -625,3 +625,52 @@ class TestEngine(DynamoSystemTest):
 
         ret = self.engine.get(Post, uid='tweet:1234', score=0)
         self.assertEqual(ret.username, 'bar')
+
+    def test_exists_hkey(self):
+        """ engine.exists(hash_key) finds item """
+        m = SingleKeyModel('a')
+        self.engine.save(m)
+        self.assertTrue(self.engine.exists(SingleKeyModel, 'a'))
+
+    def test_not_exists_hkey(self):
+        """ engine.exists(hash_key) returns false if not found """
+        self.assertFalse(self.engine.exists(SingleKeyModel, 'a'))
+
+    def test_exists_hkey_rkey(self):
+        """ engine.exists(hash_key, range_key) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        self.assertTrue(self.engine.exists(Widget, 'a', 'Aaron'))
+
+    def test_not_exists_hkey_rkey(self):
+        """ engine.exists(hash_key, range_key) returns false if not found """
+        self.assertFalse(self.engine.exists(Widget, 'a', 'Aaron'))
+
+    def test_exists_dict(self):
+        """ engine.exists(dict) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        pkey = {
+            'id': 'a',
+            'name': 'Aaron',
+        }
+        self.assertTrue(self.engine.exists(Widget, pkey))
+
+    def test_not_exists_dict(self):
+        """ engine.exists(dict) returns false if not found """
+        pkey = {
+            'id': 'a',
+            'name': 'Aaron',
+        }
+        self.assertFalse(self.engine.exists(Widget, pkey))
+
+    def test_exists_model(self):
+        """ engine.exists(hash_key, range_key) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        self.assertTrue(self.engine.exists(Widget, w))
+
+    def test_not_exists_model(self):
+        """ engine.exists(hash_key, range_key) returns false if not found """
+        w = Widget('a', 'Aaron')
+        self.assertFalse(self.engine.exists(Widget, w))

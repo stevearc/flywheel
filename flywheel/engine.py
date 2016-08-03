@@ -693,3 +693,36 @@ class Engine(object):
                 item.set_ddb_val_(name, None)
 
         item.post_save_fields_(set([name]))
+
+    def exists(self, model, key_or_item, range_key=None, consistent=False):
+        """
+        Check if an item exists in the database
+
+        Parameters
+        ----------
+        model : :class:`dynamodb3.Model`
+            The model class of the item to check
+        key_or_item : dict or :class:`dynamodb3.Model` or object
+            Either the value of the hash key, a model instance, or a dict that
+            contains the primary key.
+        range_key : object, optional
+            Value of the range key (if the previous argument is the hash key)
+        consistent : bool, optional
+            Perform a consistent read from dynamo (default False)
+
+        """
+        if isinstance(key_or_item, Model):
+            pkey = key_or_item.pk_dict_
+        elif isinstance(key_or_item, dict):
+            pkey = model.meta_.pk_dict(None, key_or_item)
+        else:
+            pkey = {
+                model.meta_.hash_key.name: model.meta_.hash_key.ddb_dump(key_or_item)
+            }
+            if range_key is not None:
+                pkey[model.meta_.range_key.name] = range_key
+        attrs = [model.meta_.hash_key.name]
+        ret = self.dynamo.get_item2(
+            model.meta_.ddb_tablename(self.namespace), pkey, attrs,
+            consistent=consistent)
+        return ret.exists
