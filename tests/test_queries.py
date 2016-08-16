@@ -1,8 +1,10 @@
 """ Tests for engine queries """
-from six.moves import xrange as _xrange  # pylint: disable=F0401
+import six
 from flywheel import (Field, Composite, Model, NUMBER, STRING_SET, GlobalIndex,
-                      DuplicateEntityException, EntityNotFoundException)
+                      DuplicateEntityException, EntityNotFoundException, Limit)
 from flywheel.tests import DynamoSystemTest
+
+# pylint: disable=C0121
 
 
 class User(Model):
@@ -19,6 +21,7 @@ class User(Model):
     str_set = Field(data_type=STRING_SET)
     bio = Field()
     plan = Field()
+    alias = Field()
 
 
 def score_merge(ts, upvotes):
@@ -238,22 +241,22 @@ class TestQueries(DynamoSystemTest):
 
     def test_filter_ne(self):
         """ Queries can filter ne """
-        u = User(id='a', name='Adam')
-        u2 = User(id='a', name='Aaron')
+        u = User(id='a', name='Adam', alias="A")
+        u2 = User(id='a', name='Aaron', alias="a-aron")
         self.engine.save([u, u2])
 
         ret = self.engine.query(User).filter(User.id == 'a')\
-            .filter(User.name != 'Adam').one()
+            .filter(User.alias != "A").one()
         self.assertEqual(ret, u2)
 
     def test_filter_in(self):
         """ Queries can filter in """
-        u = User(id='a', name='Adam')
-        u2 = User(id='a', name='Aaron')
+        u = User(id='a', name='Adam', alias='A')
+        u2 = User(id='a', name='Aaron', alias='a-aron')
         self.engine.save([u, u2])
 
         ret = self.engine.query(User).filter(User.id == 'a')\
-            .filter(User.name.in_(set(['Adam']))).one()
+            .filter(User.alias.in_(set(['A', 'b']))).one()
         self.assertEqual(ret, u)
 
     def test_filter_contains(self):
@@ -349,6 +352,37 @@ class TestQueries(DynamoSystemTest):
         results = self.engine.query(User).filter(User.id == 'a')\
             .filter(User.bio < 'ddd').all()
         self.assertEquals(results, [u])
+
+    def test_limit_and_resume(self):
+        """ Query can provide a limit and resume later """
+        users = [User('a', 'a', score=1), User('a', 'b', score=2), User('a', 'c', score=2)]
+        self.engine.save(users)
+        limit = Limit(item_limit=1, strict=True)
+        results = self.engine.query(User).filter(id='a') \
+            .filter(User.score > 0).limit(limit).all()
+        self.assertEqual(len(results), 1)
+
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 2)
+
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+
+        # We should have seen all the items by this point
+        last_evaluated_key = results[-1].index_pk_dict_('score-index')
+        results.extend(self.engine.query(User).filter(id='a')
+                       .filter(User.score > 0).limit(limit).all(
+                           exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+        # This fails in python 2.6
+        if six.PY3:
+            self.assertItemsEqual(results, users)
 
 
 class TestCompositeQueries(DynamoSystemTest):
@@ -460,7 +494,7 @@ class TestOrder(DynamoSystemTest):
 
     def _add_widgets(self):
         """ Add a bunch of widgets with different alpha/beta values """
-        for i in _xrange(10):
+        for i in range(10):
             w = Widget('a', str(i), alpha=i)
             w.beta = (i + 5) % 10
             self.engine.save(w)
@@ -501,7 +535,7 @@ class SingleKeyModel(Model):
 class TestEngine(DynamoSystemTest):
 
     """ Tests for misc engine functionality """
-    models = [Post, SingleKeyModel]
+    models = [Post, SingleKeyModel, Widget]
 
     def test_get(self):
         """ Fetch item directly by primary key """
@@ -582,3 +616,63 @@ class TestEngine(DynamoSystemTest):
     def test_delete_key_empty(self):
         """ No error if deleting no keys """
         self.engine.delete_key(SingleKeyModel, [])
+
+    def test_model_save(self):
+        """ Save can overwrite item data """
+        p = Post(type='tweet', id='1234', username='foo')
+        self.engine.save(p)
+
+        p.username = 'bar'
+        p.save(overwrite=True)
+
+        ret = self.engine.get(Post, uid='tweet:1234', score=0)
+        self.assertEqual(ret.username, 'bar')
+
+    def test_exists_hkey(self):
+        """ engine.exists(hash_key) finds item """
+        m = SingleKeyModel('a')
+        self.engine.save(m)
+        self.assertTrue(self.engine.exists(SingleKeyModel, 'a'))
+
+    def test_not_exists_hkey(self):
+        """ engine.exists(hash_key) returns false if not found """
+        self.assertFalse(self.engine.exists(SingleKeyModel, 'a'))
+
+    def test_exists_hkey_rkey(self):
+        """ engine.exists(hash_key, range_key) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        self.assertTrue(self.engine.exists(Widget, 'a', 'Aaron'))
+
+    def test_not_exists_hkey_rkey(self):
+        """ engine.exists(hash_key, range_key) returns false if not found """
+        self.assertFalse(self.engine.exists(Widget, 'a', 'Aaron'))
+
+    def test_exists_dict(self):
+        """ engine.exists(dict) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        pkey = {
+            'id': 'a',
+            'name': 'Aaron',
+        }
+        self.assertTrue(self.engine.exists(Widget, pkey))
+
+    def test_not_exists_dict(self):
+        """ engine.exists(dict) returns false if not found """
+        pkey = {
+            'id': 'a',
+            'name': 'Aaron',
+        }
+        self.assertFalse(self.engine.exists(Widget, pkey))
+
+    def test_exists_model(self):
+        """ engine.exists(hash_key, range_key) finds item """
+        w = Widget('a', 'Aaron')
+        self.engine.save(w)
+        self.assertTrue(self.engine.exists(Widget, w))
+
+    def test_not_exists_model(self):
+        """ engine.exists(hash_key, range_key) returns false if not found """
+        w = Widget('a', 'Aaron')
+        self.assertFalse(self.engine.exists(Widget, w))

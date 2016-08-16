@@ -1,17 +1,21 @@
 """ Tests for models """
 import six
+import sys
 import json
+from datetime import datetime
 from decimal import Decimal
 from mock import patch, ANY
 from dynamo3 import ItemUpdate
 
 from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
                       ConditionalCheckFailedException)
+from flywheel.fields.types import UTC
 from flywheel.tests import DynamoSystemTest
 try:
     import unittest2 as unittest  # pylint: disable=F0401
 except ImportError:
     import unittest
+# pylint: disable=E1101
 
 
 class Widget(Model):
@@ -261,7 +265,8 @@ class TestModelMutation(DynamoSystemTest):
         """ Sync with constraints fails if raise_on_conflict is False """
         p = Post('a', 'b', 4)
         with self.assertRaises(ValueError):
-            self.engine.sync(p, raise_on_conflict=False, constraints=[Post.ts < 5])
+            self.engine.sync(p, raise_on_conflict=False,
+                             constraints=[Post.ts < 5])
 
     def test_delete(self):
         """ Model can delete itself """
@@ -298,6 +303,38 @@ class TestModelMutation(DynamoSystemTest):
         p.sync()
         p2.refresh()
         self.assertEquals(p2.ts, p.ts)
+
+    def test_refresh_multiple_models(self):
+        """ Can refresh multiple model types """
+        p = Post('a', 'b', 4)
+        self.engine.save(p)
+        p2 = self.engine.scan(Post).first()
+        p2.ts = 10
+        p2.sync()
+
+        a = Article(text='unfortunately')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'obviously'
+        a2.sync()
+
+        self.engine.refresh([a, p])
+        self.assertEquals(p.ts, p2.ts)
+        self.assertEquals(a.text, a2.text)
+
+    def test_refresh_missing(self):
+        """ Refreshing a set of models should work even if one is missing """
+        p1 = Post('a', 'b', 4)
+        p2 = Post('a', 'c', 5)
+        p3 = Post('a', 'd', 6)
+        self.engine.save([p1, p2])
+        self.engine.refresh([p1, p2, p3])
+        self.assertEqual(p1.id, 'b')
+        self.assertEqual(p2.id, 'c')
+        self.assertEqual(p3.id, 'd')
+        self.assertEqual(p1.ts, 4)
+        self.assertEqual(p2.ts, 5)
+        self.assertEqual(p3.ts, 6)
 
     def test_sync_blank(self):
         """ Sync creates item even if only primary key is set """
@@ -667,6 +704,118 @@ class TestModelMutation(DynamoSystemTest):
         self.assertEqual(a.text, 'foo')
 
 
+class TestUpdateField(DynamoSystemTest):
+
+    """ Tests for engine.update_field """
+    models = [Article]
+
+    def test_update_field_default_value(self):
+        """ update_field: Omitting value will use current model value """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        self.engine.update_field(a, 'text')
+        self.assertEqual(a.text, 'foobar')
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_value(self):
+        """ update_field: Can pass in value to set """
+        a = Article()
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', 'foo')
+        self.assertEqual(a.text, 'foo')
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_delete(self):
+        """ update_field: Passing in None will delete the field """
+        a = Article(text='foobar')
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', None)
+        self.assertEqual(a.text, None)
+        result = self.engine.scan(Article).first()
+        self.assertEquals(result.text, a.text)
+
+    def test_update_field_clean(self):
+        """ update_field: Remove from dirty afterwards """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        self.assertIn('text', a.__dirty__)
+        self.engine.update_field(a, 'text')
+        self.assertNotIn('text', a.__dirty__)
+
+    def test_update_field_limit_clean(self):
+        """ update_field: Prior unrelated dirty fields stay dirty """
+        a = Article()
+        self.engine.save(a)
+        a.text = 'foobar'
+        a.views = 5
+        self.assertIn('views', a.__dirty__)
+        self.engine.update_field(a, 'text')
+        self.assertIn('views', a.__dirty__)
+
+    def test_update_field_constraints(self):
+        """ update_field: Can pass in constraints """
+        a = Article()
+        self.engine.save(a)
+        with self.assertRaises(ConditionalCheckFailedException):
+            self.engine.update_field(a, 'text', 'foobar', constraints=[Article.views > 2])
+
+    def test_update_field_add(self):
+        """ update_field: Can perform an atomic add instead of a put """
+        a = Article()
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        self.engine.update_field(a, 'views', 1, action='ADD')
+        self.engine.update_field(a2, 'views', 2, action='ADD')
+        ret = self.engine.scan(Article).first()
+        self.assertEqual(ret.views, 3)
+
+    def test_update_field_delete_action(self):
+        """ update_field: Can perform an atomic delete instead of a put """
+        a = Article(text='foobar')
+        self.engine.save(a)
+        self.engine.update_field(a, 'text', action='DELETE')
+        self.assertIsNone(a.text)
+        result = self.engine.scan(Article).first()
+        self.assertEqual(result.text, a.text)
+
+    def test_update_field_no_eq(self):
+        """ update_field: No default equality constraint """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        a2.sync()
+        self.engine.update_field(a, 'text', 'baz')
+        ret = self.engine.scan(Article).first()
+        self.assertEqual(ret.text, 'baz')
+
+
+class SetModel(Model):
+
+    """ Test model with set """
+    id = Field(hash_key=True)
+    items = Field(data_type=set)
+
+
+class TestDefaults(DynamoSystemTest):
+
+    """ Test field defaults """
+    models = [SetModel]
+
+    def test_copy_mutable_field_default(self):
+        """ Model fields should not share any mutable field defaults """
+        m1 = SetModel('a')
+        m1.items.add('foo')
+        self.engine.save(m1)
+        m2 = SetModel('b')
+        self.assertTrue(m2.items is not m1.items)
+        self.assertEqual(m2.items, set())
+
+
 class Store(Model):
 
     """ Test model for indexes """
@@ -858,3 +1007,62 @@ class TestModelDefaults(unittest.TestCase):
         m2 = Bare('a', 2)
         self.assertNotEqual(m1, m2)
         self.assertNotEqual(hash(m1), hash(m2))
+
+
+class FloatModel(Model):
+    """ Test model with floats in the primary key """
+    hkey = Field(data_type=int, hash_key=True)
+    rkey = Field(data_type=float, range_key=True)
+
+
+class TestRefresh(DynamoSystemTest):
+
+    """ Test model refresh """
+    models = [FloatModel]
+
+    def test_refresh_floating_point(self):
+        """ Refresh with floats should not cause problems """
+        p = FloatModel(4, 4.2932982983292)
+        self.engine.save(p)
+        p.refresh()
+        # If there is a floating point mismatch, an error will be raised by now
+
+
+class DatetimeModel(Model):
+    """ Just something with a field that can raise when comparing """
+    hkey = Field(data_type=int, hash_key=True)
+    field = Field(data_type=datetime)
+
+
+class ExplodingComparisons(DynamoSystemTest):
+
+    """Make sure all comparisons are dealt with gracefully.
+
+    This came up when comparing datetime objects with different TZ awareness,
+    but applies to all error raises."""
+
+    models = [DatetimeModel]
+
+    def setUp(self):
+        super(ExplodingComparisons, self).setUp()
+
+        self.o = DatetimeModel(1, field=datetime.utcnow())
+        self.engine.save(self.o)
+
+    def test_ok(self):
+        """ Happy case """
+        self.o.field = datetime.utcnow()  # Same TZ awareness, should not raise.
+
+    # Comaparing datetimes with == on 3.3 onwards doesn't raise.
+    if sys.version_info[:2] < (3, 3):
+        def test_kaboom(self):
+            """ Sad case """
+            now = datetime.utcnow().replace(tzinfo=UTC)
+
+            # Prove to ourselves this explodes.
+            with self.assertRaises(TypeError):
+                # Because pylint was confused about not doing anything with the
+                # =='s result
+                bool(self.o.field == now)
+
+            self.o.field = now

@@ -1,6 +1,35 @@
 Changelog
 =========
 
+0.4.10
+------
+* Feature: Add ``exists()`` method to Engine (:issue:`45`)
+
+0.4.9
+-----
+* Feature: Add ``save()`` method to Models (:issue:`40`)
+* Feature: Add ``update_field()`` method to Engine (:issue:`43`)
+
+0.4.8
+-----
+* Bug fix: Bad function call in ``index_pk_dict_``
+
+0.4.7
+-----
+* New ``index_pk_dict_`` method for constructing `exclusive_start_key` for index queries (:issue:`34`)
+
+0.4.6
+-----
+* Pass exclusive_start_key through to dynamo3 (:issue:`34`)
+
+0.4.5
+-----
+* Bug fix: Calling refresh() could sometimes crash from unordered results.
+
+0.4.4
+-----
+* Bug fix: Mutable field defaults are no longer shared among model instances
+
 0.4.3
 -----
 * Bug fix: Incorrect ``ConditionalCheckFailedException`` when syncing changes to a Composite field.
@@ -27,7 +56,7 @@ Changelog
 * Feature: Fields support multiple validation checks
 * Feature: Fields have an easy way to enforce non-null values (``nullable=False``)
 
-Data type changes are due to an `update in the DynamoDB API
+Data type changes are due to `an update in the DynamoDB API
 <https://aws.amazon.com/blogs/aws/dynamodb-update-json-and-more/>`_
 
 0.3.0

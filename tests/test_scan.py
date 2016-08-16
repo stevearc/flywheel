@@ -6,8 +6,10 @@ import inspect
 from decimal import Decimal
 
 from .test_queries import User
-from flywheel import Model, Field
+from flywheel import Model, Field, Limit
 from flywheel.tests import DynamoSystemTest
+
+# pylint: disable=C0121
 
 
 class TestScan(DynamoSystemTest):
@@ -182,6 +184,33 @@ class TestScan(DynamoSystemTest):
         self.assertEqual(len(results), 2)
         self.assertTrue(u in results)
         self.assertTrue(u2 in results)
+
+    def test_limit_and_resume(self):
+        """ Scan can provide a limit and resume later """
+        users = [User('a', 'a'), User('b', 'b'), User('c', 'c')]
+        self.engine.save(users)
+        limit = Limit(item_limit=1, strict=True)
+        results = self.engine.scan(User).limit(limit).all()
+        self.assertEqual(len(results), 1)
+
+        last_evaluated_key = results[-1].pk_dict_
+        results.extend(self.engine.scan(User).limit(limit).all(
+            exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 2)
+
+        last_evaluated_key = results[-1].pk_dict_
+        results.extend(self.engine.scan(User).limit(limit).all(
+            exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+
+        # We should have seen all the items by this point
+        last_evaluated_key = results[-1].pk_dict_
+        results.extend(self.engine.scan(User).limit(limit).all(
+            exclusive_start_key=last_evaluated_key))
+        self.assertEqual(len(results), 3)
+        # This fails in python 2.6
+        if six.PY3:
+            self.assertItemsEqual(results, users)
 
 
 class Widget(Model):

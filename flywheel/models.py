@@ -139,9 +139,16 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def refresh(self, consistent=False):
         """ Overwrite model data with freshest from database """
         if self.__engine__ is None:
-            raise ValueError("Cannot sync: No DB connection")
+            raise ValueError("Cannot refresh: No DB connection")
 
         self.__engine__.refresh(self, consistent=consistent)
+
+    def save(self, overwrite=None):
+        """ Save model data to database (see also: sync) """
+        if self.__engine__ is None:
+            raise ValueError("Cannot save: No DB connection")
+
+        self.__engine__.save(self, overwrite=overwrite)
 
     def sync(self, *args, **kwargs):
         """ Sync model changes back to database """
@@ -208,8 +215,11 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
             # Don't mark the field dirty if the new and old values are the same
             oldv = getattr(self, name, SENTINEL)
-            if not self._loading and oldv is not SENTINEL and \
-                    oldv == coerced_value:
+            try:
+                same_value = oldv is not SENTINEL and oldv == coerced_value
+            except Exception:
+                same_value = False
+            if not self._loading and same_value:
                 return
             self.mark_dirty_(name)
             if (not self._loading and self.persisted_ and
@@ -272,6 +282,15 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def pk_dict_(self):
         """ The primary key dict, encoded for dynamo """
         return self.meta_.pk_dict(self, ddb_dump=True)
+
+    def index_pk_dict_(self, index_name):
+        """ The primary key dict for an index, encoded for dynamo """
+        return self.meta_.index_pk_dict(index_name, self, ddb_dump=True)
+
+    @property
+    def pk_tuple_(self):
+        """ The primary key dict, encoded for dynamo """
+        return self.meta_.pk_tuple(self, ddb_dump=True)
 
     @property
     def persisted_(self):
@@ -358,6 +377,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
         for field in six.itervalues(self.meta_.fields):
             field.validate(self)
 
+    def post_save_fields_(self, fields):
+        """ Called after update_field or update_fields """
+        self.__dirty__.difference_update(fields)
+        for name in fields:
+            self.__incrs__.pop(name, None)
+            if name in self.__cache__:
+                self.__cache__[name] = copy.copy(getattr(self, name))
+
     def post_save_(self):
         """ Called after item is saved to database """
         self._persisted = True
@@ -388,6 +415,13 @@ class Model(six.with_metaclass(ModelMetaclass)):
         yield
         self._loading = False
         self.post_load_(engine)
+
+    @contextlib.contextmanager
+    def partial_loading_(self):
+        """ For use when loading a partial object (i.e. from update_field) """
+        self._loading = True
+        yield
+        self._loading = False
 
     def ddb_dump_field_(self, name):
         """ Dump a field to a Dynamo-friendly value """
@@ -436,6 +470,23 @@ class Model(six.with_metaclass(ModelMetaclass)):
             else:
                 expect[name + '__eq'] = val
         return expect
+
+    @classmethod
+    def field_(cls, name):
+        """
+        Get Field or construct a placeholder for an undeclared field
+
+        This is used for creating scan filter constraints on fields that were
+        not declared in the model
+
+        """
+        field = cls.meta_.fields.get(name)
+        if field is not None:
+            return field
+        field = Field()
+        field.name = name
+        field.overflow = True
+        return field
 
     def __json__(self, request=None):
         data = {}

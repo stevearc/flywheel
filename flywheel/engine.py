@@ -1,14 +1,20 @@
 """ Query engine """
 import itertools
-from collections import defaultdict
 
+import logging
 import six
-from dynamo3 import DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW
-from six.moves import zip as izip  # pylint: disable=F0401
+from collections import defaultdict
+from dynamo3 import (DynamoDBConnection, CheckFailed, ItemUpdate, ALL_NEW,
+                     UPDATED_NEW)
 
 from .fields import Field
 from .models import Model, SetDelta
 from .query import Query, Scan
+
+
+LOG = logging.getLogger(__name__)
+
+NO_ARG = object()
 
 
 class Engine(object):
@@ -136,11 +142,15 @@ class Engine(object):
 
     def connect_to_region(self, region, **kwargs):
         """ Connect to an AWS region """
-        self.dynamo = DynamoDBConnection.connect_to_region(region, **kwargs)
+        self.dynamo = DynamoDBConnection.connect(region, **kwargs)
 
     def connect_to_host(self, **kwargs):
         """ Connect to a specific host """
         self.dynamo = DynamoDBConnection.connect_to_host(**kwargs)
+
+    def connect(self, *args, **kwargs):
+        """ Connect to a specific host """
+        self.dynamo = DynamoDBConnection.connect(*args, **kwargs)
 
     def register(self, *models):
         """
@@ -483,16 +493,26 @@ class Engine(object):
             return
 
         tables = defaultdict(list)
+        model_map = defaultdict(dict)
         for item in items:
-            tables[item.meta_.ddb_tablename(self.namespace)].append(item)
+            tablename = item.meta_.ddb_tablename(self.namespace)
+            tables[tablename].append(item)
+            model_map[tablename][item.pk_tuple_] = item
 
         for tablename, items in six.iteritems(tables):
             keys = [item.pk_dict_ for item in items]
             results = self.dynamo.batch_get(tablename, keys,
                                             consistent=consistent)
-            for item, data in izip(items, results):
+            meta = items[0].meta_
+            for result in results:
+                pkey = meta.pk_tuple(None, result, ddb_load=True)
+                item = model_map[tablename].get(pkey)
+                if item is None:
+                    LOG.error("Refresh error: Cannot match primary key %r to "
+                              "a model", pkey)
+                    continue
                 with item.loading_(self):
-                    for key, val in data.items():
+                    for key, val in six.iteritems(result):
                         item.set_ddb_val_(key, val)
 
     def sync(self, items, raise_on_conflict=None, consistent=False,
@@ -606,3 +626,91 @@ class Engine(object):
         # Refresh item data
         if not no_read:
             self.refresh(refresh_models, consistent=consistent)
+
+    def update_field(self, item, name, value=NO_ARG, action=ItemUpdate.PUT,
+                     constraints=None):
+        """
+        Update the value of a single field
+
+        Note that this method bypasses field validators and will ignore any
+        special behavior around Composite fields.
+
+        Parameters
+        ----------
+        item : :class:`~flywheel.models.Model`
+            The model to update
+        name : str
+            The name of the field to update
+        value : object, optional
+            The new value for the field. Default will use the value currently
+            on the model.
+        action : str, optional
+            PUT, ADD, or DELETE. (default PUT)
+        constraints : list, optional
+            List of constraints that must pass for the update to complete.
+            Format is the same as query filters (e.g. Model.fieldname > 5)
+
+        """
+        if value is NO_ARG:
+            if action == ItemUpdate.DELETE:
+                value = None
+            elif action == ItemUpdate.ADD:
+                raise ValueError("Must specify a value when using the "
+                                 "actions ADD or DELETE")
+            else:
+                value = getattr(item, name)
+
+        keywords = {}
+        if constraints is not None:
+            for constraint in constraints:
+                keywords.update(constraint.scan_kwargs())
+
+        updates = [
+            ItemUpdate(action, name, item.field_(name).ddb_dump_for_query(value))
+        ]
+
+        ret = self.dynamo.update_item(
+            item.meta_.ddb_tablename(self.namespace), item.pk_dict_,
+            updates, returns=UPDATED_NEW, **keywords)
+        with item.partial_loading_():
+            for key, val in six.iteritems(ret):
+                item.set_ddb_val_(key, val)
+            # If we didn't see the field in the response,
+            # it must have been deleted.
+            if name not in ret:
+                item.set_ddb_val_(name, None)
+
+        item.post_save_fields_(set([name]))
+
+    def exists(self, model, key_or_item, range_key=None, consistent=False):
+        """
+        Check if an item exists in the database
+
+        Parameters
+        ----------
+        model : :class:`dynamodb3.Model`
+            The model class of the item to check
+        key_or_item : dict or :class:`dynamodb3.Model` or object
+            Either the value of the hash key, a model instance, or a dict that
+            contains the primary key.
+        range_key : object, optional
+            Value of the range key (if the previous argument is the hash key)
+        consistent : bool, optional
+            Perform a consistent read from dynamo (default False)
+
+        """
+        if isinstance(key_or_item, Model):
+            pkey = key_or_item.pk_dict_
+        elif isinstance(key_or_item, dict):
+            pkey = model.meta_.pk_dict(None, key_or_item)
+        else:
+            pkey = {
+                model.meta_.hash_key.name: model.meta_.hash_key.ddb_dump(key_or_item)
+            }
+            if range_key is not None:
+                pkey[model.meta_.range_key.name] = range_key
+        attrs = [model.meta_.hash_key.name]
+        ret = self.dynamo.get_item2(
+            model.meta_.ddb_tablename(self.namespace), pkey, attrs,
+            consistent=consistent)
+        return ret.exists
