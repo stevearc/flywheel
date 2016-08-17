@@ -8,6 +8,10 @@ Changelog
 * Feature: sync() has a new argument, ``no_read``, which changes the behavior for syncing models with no changes. Instead of performing a GET, it will leave them as-is. This should make it easer to perform batch syncs without worrying as much about wasted bandwidth on GETs. 
 * ``Field`` has renamed the ``data_type`` argument to ``type`` (``data_type`` will still work)
 
+0.4.11
+------
+* Bug fix: Boolean overflow fields no longer decoded as decimals (:pr:`46`)
+
 0.4.10
 ------
 * Feature: Add ``exists()`` method to Engine (:issue:`45`)
