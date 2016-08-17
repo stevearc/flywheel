@@ -254,7 +254,9 @@ class Field(object):
     @classmethod
     def ddb_load_overflow(cls, val):
         """ Decode a value of an overflow field """
-        if (isinstance(val, Decimal) or isinstance(val, float) or
+        if isinstance(val, bool):
+            return val
+        elif (isinstance(val, Decimal) or isinstance(val, float) or
                 isinstance(val, six.integer_types)):
             if val % 1 == 0:
                 return int(val)
