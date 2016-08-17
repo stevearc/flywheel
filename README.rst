@@ -30,10 +30,10 @@ API documentation
         }
         userid = Field(hash_key=True)
         title = Field(range_key=True)
-        top_score = Field(data_type=int)
-        top_score_time = Field(data_type=datetime)
-        wins = Field(data_type=int)
-        losses = Field(data_type=int)
+        top_score = Field(type=int)
+        top_score_time = Field(type=datetime)
+        wins = Field(type=int)
+        losses = Field(type=int)
 
         def __init__(self, title, userid):
             self.title = title

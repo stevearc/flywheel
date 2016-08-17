@@ -95,8 +95,8 @@ results to be sorted by a particular index when only querying the hash key.
     class Tweet(Model):
         userid = Field(hash_key=True)
         id = Field(range_key=True)
-        ts = Field(data_type=datetime, index='ts-index')
-        retweets = Field(data_type=int, index='rt-index')
+        ts = Field(type=datetime, index='ts-index')
+        retweets = Field(type=int, index='rt-index')
 
     # This returns 10 tweets in id order (more-or-less random)
     ten_tweets = engine.query(Tweet).filter(userid='abc123').limit(10).all()

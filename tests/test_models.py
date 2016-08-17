@@ -57,9 +57,9 @@ class Post(Model):
     score = Composite('likes', 'ts', 'deleted', data_type=NUMBER,
                       merge=lambda x, y, z: None if z else x + y)
     likes = Field(data_type=int, default=0)
-    ts = Field(data_type=float, default=0)
-    deleted = Field(data_type=bool, default=False)
-    points = Field(data_type=Decimal, default=Decimal('0'))
+    ts = Field(type=float, default=0)
+    deleted = Field(type=bool, default=False)
+    points = Field(type=Decimal, default=Decimal('0'))
     about = Field()
     text = Field()
     tags = Field(data_type=set)

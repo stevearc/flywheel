@@ -18,7 +18,7 @@ Here are the steps to set up a simple example model with flywheel:
     class Tweet(Model):
         userid = Field(hash_key=True)
         id = Field(range_key=True)
-        ts = Field(data_type=datetime, index='ts-index')
+        ts = Field(type=datetime, index='ts-index')
         text = Field()
 
         def __init__(self, userid, id, ts, text):

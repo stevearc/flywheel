@@ -13,12 +13,12 @@ require an import:
     from flywheel import Model, Field, STRING, NUMBER
 
     class Tweet(Model):
-        userid = Field(data_type=STRING, hash_key=True)
-        id = Field(data_type=STRING, range_key=True)
-        ts = Field(data_type=NUMBER, index='ts-index')
-        text = Field(data_type=STRING)
+        userid = Field(type=STRING, hash_key=True)
+        id = Field(type=STRING, range_key=True)
+        ts = Field(type=NUMBER, index='ts-index')
+        text = Field(type=STRING)
 
-There are other settings for data_type that are represented by python
+There are other settings for type that are represented by python
 primitives. Some of them (like ``unicode``) are functionally equivalent to the
 DynamoDB option (``STRING``). Others, like ``int``, enforce an additional
 application-level constraint on the data. Each option works transparently, so a
@@ -79,7 +79,7 @@ you.
 
     >>> class Game(Model):
     ...    title = Field(hash_key=True)
-    ...    points = Field(data_type=int, coerce=True)
+    ...    points = Field(type=int, coerce=True)
 
     >>> mygame = Game()
     >>> mygame.points = 1.8
@@ -88,12 +88,12 @@ you.
 Set types
 ---------
 If you define a ``set`` field with no additional parameters
-``Field(data_type=set)``, flywheel will ensure that the field is a set, but
+``Field(type=set)``, flywheel will ensure that the field is a set, but
 will perform no type checking on the items within the set. This should work
 fine for basic uses when you are storing a number or string, but sets are able
 to contain any data type listed in the table above (and any :ref:`custom type
 <custom_data_type>` you declare). All you have to do is specify it in the
-``data_type`` like so:
+``type`` like so:
 
 .. code-block:: python
 
@@ -102,14 +102,14 @@ to contain any data type listed in the table above (and any :ref:`custom type
 
     class Location(Model):
         name = Field(hash_key=True)
-        events = Field(data_type=set_(date))
+        events = Field(type=set_(date))
 
 If you don't want to import ``set_``, you can use an equivalent expression with
 the python ``frozenset`` builtin:
 
 .. code-block:: python
 
-    events = Field(data_type=frozenset([date]))
+    events = Field(type=frozenset([date]))
 
 .. _custom_data_type:
 
@@ -123,7 +123,7 @@ database. An example:
 .. code-block:: python
 
     class Widget(Model):
-        id = Field(data_type=int, check=lambda x: x > 0)
+        id = Field(type=int, check=lambda x: x > 0)
 
 To apply multiple validation checks, pass them in as a list or tuple:
 
@@ -136,7 +136,7 @@ To apply multiple validation checks, pass them in as a list or tuple:
         return x >= 0
 
     class Widget(Model):
-        odd_natural_num = Field(data_type=int, check=(is_odd, is_natural))
+        odd_natural_num = Field(type=int, check=(is_odd, is_natural))
 
 There is a special case for enforcing that a field is non-null, since it is a
 common case:
@@ -162,7 +162,7 @@ store any python object in pickled format.
     import cPickle as pickle
 
     class PickleType(TypeDefinition):
-        data_type = pickle #  name you use to reference this type
+        type = pickle #  name you use to reference this type
         aliases = ['pickle'] # alternate names that reference this type
         ddb_data_type = BINARY # data type of the field in dynamo
 
@@ -183,10 +183,10 @@ Now that you have your type definition, you can either use it directly in your c
 .. code-block:: python
 
     class MyModel(Model):
-        myobj = Field(data_type=PickleType())
+        myobj = Field(type=PickleType())
 
 
-Or you can register it globally and reference it by its ``data_type`` or any
+Or you can register it globally and reference it by its ``type`` or any
 ``aliases`` that were defined.
 
 .. code-block:: python
@@ -196,4 +196,4 @@ Or you can register it globally and reference it by its ``data_type`` or any
     register_type(PickleType)
 
     class MyModel(Model):
-        myobj = Field(data_type='pickle')
+        myobj = Field(type='pickle')

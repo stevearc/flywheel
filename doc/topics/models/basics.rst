@@ -9,7 +9,7 @@ This is what a model looks like:
     class Tweet(Model):
         userid = Field(hash_key=True)
         id = Field(range_key=True)
-        ts = Field(data_type=datetime, index='ts-index')
+        ts = Field(type=datetime, index='ts-index')
         text = Field()
 
 The model declares the fields an object has, their :ref:`data

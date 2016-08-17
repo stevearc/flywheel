@@ -28,7 +28,7 @@ class Field(object):
     index : str, optional
         If present, create a local secondary index on this field with this as
         the name.
-    data_type : object, optional
+    type : object, optional
         The field data type. You may use int, unicode, set, etc. or you may
         pass in an instance of :class:`~flywheel.fields.types.TypeDefinition`
         (default unicode)
@@ -66,13 +66,15 @@ class Field(object):
     """
 
     def __init__(self, hash_key=False, range_key=False, index=None,
-                 data_type=six.text_type, coerce=False, check=None,
-                 nullable=True, default=NO_ARG):
+                 data_type=NO_ARG, type=six.text_type, coerce=False,
+                 check=None, nullable=True, default=NO_ARG):
         if hash_key and range_key:
             raise ValueError("hash_key and range_key are mutually exclusive!")
         self.name = None
         self.model = None
         self.composite = False
+        if data_type is NO_ARG:
+            data_type = type
         if isinstance(data_type, TypeDefinition):
             self.data_type = data_type
         elif (inspect.isclass(data_type) and
