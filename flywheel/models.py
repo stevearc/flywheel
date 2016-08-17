@@ -3,10 +3,13 @@ import six
 import contextlib
 import copy
 import itertools
+import logging
 
 from dynamo3 import is_null
 from .fields import Field, NUMBER
 from .model_meta import ModelMetaclass, ModelMetadata, Ordering
+
+LOG = logging.getLogger(__name__)
 
 # pylint: disable=E1002
 
@@ -120,8 +123,6 @@ class Model(six.with_metaclass(ModelMetaclass)):
     __dirty__ = None
     __cache__ = None
     __incrs__ = None
-    # dict of all undeclared fields that have been set
-    _overflow = None
     _persisted = False
     _loading = False
 
@@ -149,19 +150,18 @@ class Model(six.with_metaclass(ModelMetaclass)):
 
         self.__engine__.save(self, overwrite=overwrite)
 
-    def sync(self, raise_on_conflict=None, constraints=None):
+    def sync(self, *args, **kwargs):
         """ Sync model changes back to database """
         if self.__engine__ is None:
             raise ValueError("Cannot sync: No DB connection")
 
-        self.__engine__.sync(self, raise_on_conflict=raise_on_conflict,
-                             constraints=constraints)
+        self.__engine__.sync(self, *args, **kwargs)
 
-    def delete(self, raise_on_conflict=None):
+    def delete(self, *args, **kwargs):
         """ Delete the model from the database """
         if self.__engine__ is None:
             raise ValueError("Cannot delete: No DB connection")
-        self.__engine__.delete(self, raise_on_conflict=raise_on_conflict)
+        self.__engine__.delete(self, *args, **kwargs)
 
     @classmethod
     def __on_create__(cls):
@@ -184,7 +184,6 @@ class Model(six.with_metaclass(ModelMetaclass)):
                     if not is_null(field.default):
                         mark_dirty.append(name)
         obj.__dirty__.update(mark_dirty)
-        obj._overflow = {}
         obj._persisted = False
         return obj
 
@@ -195,26 +194,29 @@ class Model(six.with_metaclass(ModelMetaclass)):
                  self.meta_.range_key.name in self.meta_.related_fields[key]))
 
     def __setattr__(self, name, value):
-        if self.persisted_:
-            if self._is_field_primary(name):
-                if value != getattr(self, name):
-                    raise AttributeError(
-                        "Cannot change an item's primary key!")
-                else:
-                    return
         field = self.meta_.fields.get(name)
-        if field is not None:
+        if field is None:
+            return super(Model, self).__setattr__(name, value)
+        else:
             # Ignore if trying to set a composite field
             if field.composite:
                 return
+            if self.persisted_:
+                if self._is_field_primary(name):
+                    if value != getattr(self, name):
+                        raise AttributeError(
+                            "Cannot change an item's primary key!")
+                    else:
+                        return
+            coerced_value = field.coerce(value)
             # Mutable fields check if they're dirty during sync()
             if field.is_mutable:
-                return super(Model, self).__setattr__(name, field.coerce(value))
+                return super(Model, self).__setattr__(name, coerced_value)
 
             # Don't mark the field dirty if the new and old values are the same
             oldv = getattr(self, name, SENTINEL)
             try:
-                same_value = oldv is not SENTINEL and oldv == value
+                same_value = oldv is not SENTINEL and oldv == coerced_value
             except Exception:
                 same_value = False
             if not self._loading and same_value:
@@ -225,19 +227,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
                 for related in self.meta_.related_fields[name]:
                     cached_var = copy.copy(getattr(self, related))
                     self.__cache__[related] = cached_var
-            return super(Model, self).__setattr__(name, field.coerce(value))
-        elif name.startswith('_') or name.endswith('_'):
-            # Don't interfere with non-Field private attrs
-            return super(Model, self).__setattr__(name, value)
-        else:
-            self.mark_dirty_(name)
-            if (not self._loading and self.persisted_ and name not in
-                    self.__cache__):
-                if Field.is_overflow_mutable(value):
-                    self.__cache__[name] = copy.copy(self.get_(name))
-                else:
-                    self.__cache__[name] = self.get_(name)
-            self._overflow[name] = value
+            return super(Model, self).__setattr__(name, coerced_value)
 
     def __delattr__(self, name):
         field = self.meta_.fields.get(name)
@@ -260,12 +250,6 @@ class Model(six.with_metaclass(ModelMetaclass)):
                 return field.resolve(self)
         return super(Model, self).__getattribute__(name)
 
-    def __getattr__(self, name):
-        try:
-            return self._overflow[name]
-        except KeyError:
-            raise AttributeError("%s not found" % name)
-
     def mark_dirty_(self, name):
         """ Mark that a field is dirty """
         if self._loading or self.__dirty__ is None:
@@ -273,20 +257,16 @@ class Model(six.with_metaclass(ModelMetaclass)):
         if name in self.__incrs__:
             raise ValueError("Cannot increment field '%s' and set it in "
                              "the same update!" % name)
-        if name in self.meta_.fields:
-            self.__dirty__.update(self.meta_.related_fields[name])
-            # Never mark the primary key as dirty
-            if self.meta_.hash_key.name in self.__dirty__:
-                self.__dirty__.remove(self.meta_.hash_key.name)
-            if (self.meta_.range_key is not None and
-                    self.meta_.range_key.name in self.__dirty__):
-                self.__dirty__.remove(self.meta_.range_key.name)
-        else:
-            self.__dirty__.add(name)
-
-    def get_(self, name, default=None):
-        """ Dict-style getter for overflow attrs """
-        return self._overflow.get(name, default)
+        if name not in self.meta_.fields:
+            raise AttributeError("Cannot mark %r dirty: Not a declared field!"
+                                 % name)
+        self.__dirty__.update(self.meta_.related_fields[name])
+        # Never mark the primary key as dirty
+        if self.meta_.hash_key.name in self.__dirty__:
+            self.__dirty__.remove(self.meta_.hash_key.name)
+        if (self.meta_.range_key is not None and
+                self.meta_.range_key.name in self.__dirty__):
+            self.__dirty__.remove(self.meta_.range_key.name)
 
     @property
     def hk_(self):
@@ -318,8 +298,8 @@ class Model(six.with_metaclass(ModelMetaclass)):
         return self._persisted
 
     def keys_(self):
-        """ All declared fields and any additional fields """
-        return itertools.chain(self.meta_.fields.keys(), self._overflow.keys())
+        """ All declared fields """
+        return self.meta_.fields.keys()
 
     def cached_(self, name, default=None):
         """ Get the cached (server) value of a field """
@@ -329,9 +309,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
             return self.__cache__[name]
         field = self.meta_.fields.get(name)
         # Need this redirection for Composite fields
-        if field is not None:
-            return field.get_cached_value(self)
-        return getattr(self, name, default)
+        return field.get_cached_value(self)
 
     def incr_(self, **kwargs):
         """ Atomically increment a number value """
@@ -340,28 +318,25 @@ class Model(six.with_metaclass(ModelMetaclass)):
                 raise AttributeError("Cannot increment an item's primary key!")
 
             field = self.meta_.fields.get(key)
-            if field is not None:
-                if field.ddb_data_type != NUMBER:
-                    raise TypeError("Cannot increment non-number field '%s'" %
-                                    key)
-                if field.composite:
-                    raise TypeError("Cannot increment composite field '%s'" %
-                                    key)
+            if field is None:
+                raise AttributeError("Cannot increment %r: Not a declared field!" % key)
+
+            if field.ddb_data_type != NUMBER:
+                raise TypeError("Cannot increment non-number field '%s'" %
+                                key)
+            if field.composite:
+                raise TypeError("Cannot increment composite field '%s'" %
+                                key)
             if key in self.__dirty__:
                 raise ValueError("Cannot set field '%s' and increment it in "
                                  "the same update!" % key)
             self.__incrs__[key] = self.__incrs__.get(key, 0) + val
-            if field is not None:
-                self.__incrs__[key] = field.coerce(self.__incrs__[key], True)
-                for name in self.meta_.related_fields[key]:
-                    self.__cache__.setdefault(name, getattr(self, name))
-                    if name != key:
-                        self.__dirty__.add(name)
-                self.__dict__[key] = self.cached_(key, 0) + self.__incrs__[key]
-            else:
-                self.__cache__.setdefault(key, getattr(self, key, 0))
-                self._overflow[key] = self.cached_(
-                    key, 0) + self.__incrs__[key]
+            self.__incrs__[key] = field.coerce(self.__incrs__[key], True)
+            for name in self.meta_.related_fields[key]:
+                self.__cache__.setdefault(name, getattr(self, name))
+                if name != key:
+                    self.__dirty__.add(name)
+            self.__dict__[key] = self.cached_(key, 0) + self.__incrs__[key]
 
     def add_(self, **kwargs):
         """ Atomically add to a set """
@@ -375,13 +350,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
         """ Atomically mutate a set """
         for key, val in six.iteritems(kwargs):
             field = self.meta_.fields.get(key)
-            if field is not None:
-                if not field.is_set:
-                    raise TypeError("Cannot mutate non-set field '%s'" %
-                                    key)
-                if field.composite:
-                    raise TypeError("Cannot mutate composite field '%s'" %
-                                    key)
+            if field is None:
+                raise AttributeError("Cannot mutate %r: Not a declared field!" % key)
+            if not field.is_set:
+                raise TypeError("Cannot mutate non-set field '%s'" %
+                                key)
+            if field.composite:
+                raise TypeError("Cannot mutate composite field '%s'" %
+                                key)
             if key in self.__dirty__:
                 raise ValueError("Cannot set field '%s' and mutate it in "
                                  "the same update!" % key)
@@ -389,15 +365,11 @@ class Model(six.with_metaclass(ModelMetaclass)):
             previous = self.__incrs__.get(key, SetDelta())
             previous.add(action, val)
             self.__incrs__[key] = previous
-            if field is not None:
-                for name in self.meta_.related_fields[key]:
-                    self.__cache__.setdefault(name, getattr(self, name))
-                    if name != key:
-                        self.__dirty__.add(name)
-                self.__dict__[key] = previous.merge(self.cached_(key))
-            else:
-                self.__cache__.setdefault(key, getattr(self, key, None))
-                self._overflow[key] = previous.merge(self.cached_(key))
+            for name in self.meta_.related_fields[key]:
+                self.__cache__.setdefault(name, getattr(self, name))
+                if name != key:
+                    self.__dirty__.add(name)
+            self.__dict__[key] = previous.merge(self.cached_(key))
 
     def pre_save_(self, engine):
         """ Called before saving items """
@@ -432,20 +404,14 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def _reset_cache(self):
         """ Reset the __cache__ to only track mutable fields """
         self.__cache__ = {}
-        for name in self.keys_():
-            field = self.meta_.fields.get(name)
-            if field is None:
-                value = self.get_(name)
-                if Field.is_overflow_mutable(value):
-                    self.__cache__[name] = copy.copy(value)
-            elif not field.composite and field.is_mutable:
+        for name, field in six.iteritems(self.meta_.fields):
+            if not field.composite and field.is_mutable:
                 self.__cache__[name] = copy.copy(getattr(self, name))
 
     @contextlib.contextmanager
     def loading_(self, engine=None):
         """ Context manager to speed up object load process """
         self._loading = True
-        self._overflow = {}
         yield
         self._loading = False
         self.post_load_(engine)
@@ -460,29 +426,23 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def ddb_dump_field_(self, name):
         """ Dump a field to a Dynamo-friendly value """
         val = getattr(self, name)
-        if name in self.meta_.fields:
-            return self.meta_.fields[name].ddb_dump(val)
-        else:
-            return Field.ddb_dump_overflow(val)
+        return self.meta_.fields[name].ddb_dump(val)
 
     def ddb_dump_(self):
         """ Return a dict for inserting into DynamoDB """
         data = {}
         for name in self.meta_.fields:
             data[name] = self.ddb_dump_field_(name)
-        for name in self._overflow:
-            data[name] = self.ddb_dump_field_(name)
 
         return data
 
     def set_ddb_val_(self, key, val):
         """ Decode and set a value retrieved from Dynamo """
-        if key.startswith('_'):
-            pass
-        elif key in self.meta_.fields:
-            setattr(self, key, self.meta_.fields[key].ddb_load(val))
+        field = self.meta_.fields.get(key)
+        if field is not None:
+            setattr(self, key, field.ddb_load(val))
         else:
-            setattr(self, key, Field.ddb_load_overflow(val))
+            LOG.debug("Ignoring undeclared field %r", key)
 
     @classmethod
     def ddb_load_(cls, engine, data):
@@ -496,10 +456,7 @@ class Model(six.with_metaclass(ModelMetaclass)):
     def ddb_dump_cached_(self, name):
         """ Dump a cached field to a Dynamo-friendly value """
         val = self.cached_(name)
-        if name in self.meta_.fields:
-            return self.meta_.fields[name].ddb_dump(val)
-        else:
-            return Field.ddb_dump_overflow(val)
+        return self.meta_.fields[name].ddb_dump(val)
 
     def construct_ddb_expects_(self, fields=None):
         """ Construct a dynamo "expects" mapping based on the cached fields """
@@ -535,8 +492,6 @@ class Model(six.with_metaclass(ModelMetaclass)):
         data = {}
         for name in self.meta_.fields:
             data[name] = getattr(self, name)
-        for key, val in six.iteritems(self._overflow):
-            data[key] = val
         return data
 
     def __hash__(self):

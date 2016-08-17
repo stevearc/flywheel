@@ -1,6 +1,13 @@
 Changelog
 =========
 
+0.5.0
+-----
+* **Breakage**: Removing support for overflow fields. The only fields flywheel will care about now are those that are explicitly set as a Field()
+* Flywheel no longer forces raise_on_conflict to be True when you sync changes to fields that are part of a composite field. It is now up to the user to avoid putting their composite fields into an inconsistent state.
+* Feature: sync() has a new argument, ``no_read``, which changes the behavior for syncing models with no changes. Instead of performing a GET, it will leave them as-is. This should make it easer to perform batch syncs without worrying as much about wasted bandwidth on GETs. 
+* ``Field`` has renamed the ``data_type`` argument to ``type`` (``data_type`` will still work)
+
 0.4.11
 ------
 * Bug fix: Boolean overflow fields no longer decoded as decimals (:pr:`46`)

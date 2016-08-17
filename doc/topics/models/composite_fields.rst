@@ -45,10 +45,10 @@ change that behavior for fancier applications:
     class Post(Model):
         userid = Field(hash_key=True)
         id = Field(range_key=True)
-        likes = Field(data_type=int)
-        replies = Field(data_type=int)
-        deleted = Field(data_type=bool)
-        score = Composite('likes', 'replies', 'deleted', data_type=int,
+        likes = Field(type=int)
+        replies = Field(type=int)
+        deleted = Field(type=bool)
+        score = Composite('likes', 'replies', 'deleted', type=int,
                           merge=score_merge, index='score-index')
 
 So now you can update the ``likes`` or ``replies`` count, and the score will

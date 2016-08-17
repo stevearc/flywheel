@@ -515,7 +515,8 @@ class Engine(object):
                     for key, val in six.iteritems(result):
                         item.set_ddb_val_(key, val)
 
-    def sync(self, items, raise_on_conflict=None, consistent=False, constraints=None):
+    def sync(self, items, raise_on_conflict=None, consistent=False,
+             constraints=None, no_read=False):
         """
         Sync model changes back to database
 
@@ -537,11 +538,14 @@ class Engine(object):
             List of more complex constraints that must pass for the update to
             complete. Must be used with raise_on_conflict=True. Format is the
             same as query filters (e.g. Model.fieldname > 5)
+        no_read : bool, optional
+            If True, don't perform a GET on models with no changes. (default False)
 
         Raises
         ------
         exc : :class:`dynamo3.CheckFailed`
-            If raise_on_conflict=True and the model changed underneath us
+            If raise_on_conflict=True and the data in dynamo fails the
+            contraint checks.
 
         """
         if raise_on_conflict is None:
@@ -553,16 +557,10 @@ class Engine(object):
         refresh_models = []
         for item in items:
             # Look for any mutable fields (e.g. sets) that have changed
-            for name in item.keys_():
+            for name, field in six.iteritems(item.meta_.fields):
                 if name in item.__dirty__ or name in item.__incrs__:
                     continue
-                field = item.meta_.fields.get(name)
-                if field is None:
-                    value = item.get_(name)
-                    if Field.is_overflow_mutable(value):
-                        if value != item.cached_(name):
-                            item.__dirty__.add(name)
-                elif field.is_mutable:
+                if field.is_mutable:
                     cached_var = item.cached_(name)
                     if field.resolve(item) != cached_var:
                         for related in item.meta_.related_fields[name]:
@@ -574,20 +572,9 @@ class Engine(object):
             fields = item.__dirty__
             item.pre_save_(self)
 
-            # If the model has changed any field that is part of a composite
-            # field, FORCE the sync to raise on conflict. This prevents the
-            # composite key from potentially getting into an inconsistent state
-            _raise_on_conflict = raise_on_conflict
-            for name in itertools.chain(item.__incrs__, fields):
-                for related_name in item.meta_.related_fields.get(name, []):
-                    field = item.meta_.fields[related_name]
-                    if field.composite:
-                        _raise_on_conflict = True
-                        break
-
             keywords = {}
             constrained_fields = set()
-            if _raise_on_conflict and constraints is not None:
+            if raise_on_conflict and constraints is not None:
                 for constraint in constraints:
                     constrained_fields.update(constraint.eq_fields.keys())
                     constrained_fields.update(constraint.fields.keys())
@@ -599,7 +586,7 @@ class Engine(object):
                 field = item.meta_.fields.get(name)
                 value = getattr(item, name)
                 kwargs = {}
-                if _raise_on_conflict and name not in constrained_fields:
+                if raise_on_conflict and name not in constrained_fields:
                     kwargs = {'eq': item.ddb_dump_cached_(name)}
                 update = ItemUpdate.put(name, item.ddb_dump_field_(name),
                                         **kwargs)
@@ -637,7 +624,8 @@ class Engine(object):
                 except CheckFailed:
                     pass
         # Refresh item data
-        self.refresh(refresh_models, consistent=consistent)
+        if not no_read:
+            self.refresh(refresh_models, consistent=consistent)
 
     def update_field(self, item, name, value=NO_ARG, action=ItemUpdate.PUT,
                      constraints=None):

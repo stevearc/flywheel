@@ -32,7 +32,7 @@ Example declaration of hash and range key:
 
     class Tweet(Model):
         userid = Field(hash_key=True)
-        ts = Field(data_type=datetime, range_key=True)
+        ts = Field(type=datetime, range_key=True)
 
 For this version of a Tweet, each ``(userid, ts)`` pair is a unique value. The
 Dynamo table will be sharded across userids.
@@ -57,9 +57,9 @@ This is how they it looks in the model declaration:
     class Tweet(Model):
         userid = Field(hash_key=True)
         id = Field(range_key=True)
-        ts = Field(data_type=datetime).all_index('ts-index')
-        retweets = Field(data_type=int).keys_index('rt-index')
-        likes = Field(data_type=int).include_index('like-index', ['text'])
+        ts = Field(type=datetime).all_index('ts-index')
+        retweets = Field(type=int).keys_index('rt-index')
+        likes = Field(type=int).include_index('like-index', ['text'])
         text = Field()
 
 The default index projection is "All", so you could replace the ``ts`` field
@@ -67,7 +67,7 @@ above with:
 
 .. code-block:: python
 
-    ts = Field(data_type=datetime, index='ts-index')
+    ts = Field(type=datetime, index='ts-index')
 
 Global Secondary Indexes
 ------------------------
@@ -91,9 +91,9 @@ can be specified in the model declaration. Here are some examples below:
         userid = Field(hash_key=True)
         city = Field()
         id = Field(range_key=True)
-        ts = Field(data_type=datetime)
-        retweets = Field(data_type=int)
-        likes = Field(data_type=int)
+        ts = Field(type=datetime)
+        retweets = Field(type=int)
+        likes = Field(type=int)
         text = Field()
 
 If you want more on indexes, check out the `AWS docs on indexes

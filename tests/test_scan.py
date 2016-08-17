@@ -174,12 +174,12 @@ class TestScan(DynamoSystemTest):
 
     def test_filter_or(self):
         """ Scan can join filter constraints with OR """
-        u = User(id='a', name='Adam', foo='bar')
-        u2 = User(id='b', name='Billy', bar='baz')
-        u3 = User(id='c', name='Celine', foo='not', bar='this')
+        u = User(id='a', name='Adam', bio='bar')
+        u2 = User(id='b', name='Billy', plan='baz')
+        u3 = User(id='c', name='Celine', bio='not', plan='this')
         self.engine.save([u, u2, u3])
 
-        results = self.engine.scan(User).filter(foo='bar', bar='baz') \
+        results = self.engine.scan(User).filter(bio='bar', plan='baz') \
             .all(filter_or=True)
         self.assertEqual(len(results), 2)
         self.assertTrue(u in results)
@@ -211,129 +211,6 @@ class TestScan(DynamoSystemTest):
         # This fails in python 2.6
         if six.PY3:
             self.assertItemsEqual(results, users)
-
-
-class TestScanFilterOverflow(DynamoSystemTest):
-
-    """ Filter tests on overflow fields """
-    models = [User]
-
-    def test_filter_eq(self):
-        """ Scan overflow field can filter eq """
-        u = User(id='a', name='Adam', foobar='foo')
-        u2 = User(id='b', name='Billy', foobar='bar')
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') == 'foo').all()
-        self.assertEquals(results, [u])
-
-    def test_filter_lt(self):
-        """ Scan overflow field can filter lt """
-        u = User(id='a', name='Adam', foobar=5)
-        u2 = User(id='a', name='Aaron', foobar=2)
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User).filter(
-            User.field_('foobar') < 5).all()
-        self.assertEquals(results, [u2])
-
-    def test_filter_lte(self):
-        """ Scan overflow field can filter lte """
-        u = User(id='a', name='Aaron', foobar=1)
-        u2 = User(id='a', name='Adam', foobar=2)
-        u3 = User(id='a', name='Alison', foobar=3)
-        self.engine.save([u, u2, u3])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') <= 2).all()
-        self.assertEquals(len(results), 2)
-        self.assertTrue(u in results)
-        self.assertTrue(u2 in results)
-
-    def test_filter_gt(self):
-        """ Scan overflow field can filter gt """
-        u = User(id='a', name='Adam', foobar=5)
-        u2 = User(id='a', name='Aaron', foobar=2)
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User).filter(
-            User.field_('foobar') > 2).all()
-        self.assertEquals(results, [u])
-
-    def test_filter_gte(self):
-        """ Scan overflow field can filter gte """
-        u = User(id='a', name='Aaron', foobar=1)
-        u2 = User(id='a', name='Adam', foobar=2)
-        u3 = User(id='a', name='Alison', foobar=3)
-        self.engine.save([u, u2, u3])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') >= 2).all()
-        self.assertEquals(len(results), 2)
-        self.assertTrue(u2 in results)
-        self.assertTrue(u3 in results)
-
-    def test_filter_beginswith(self):
-        """ Scan overflow field can filter beginswith """
-        u = User(id='a', name='Adam', foobar="abc")
-        u2 = User(id='a', name='Aaron', foobar="def")
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar').beginswith_('a')).all()
-        self.assertEquals(results, [u])
-
-    def test_filter_ne(self):
-        """ Scan overflow field can filter ne """
-        u = User(id='a', name='Adam', foobar='hi')
-        u2 = User(id='a', name='Aaron', foobar='ih')
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') != 'hi').all()
-        self.assertEquals(results, [u2])
-
-    def test_filter_in(self):
-        """ Scan overflow field can filter in """
-        u = User(id='a', name='Adam', foobar='hi')
-        u2 = User(id='a', name='Aaron', foobar='ih')
-        self.engine.save([u, u2])
-        bars = set([u.foobar])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar').in_(bars)).all()
-        self.assertEquals(results, [u])
-
-    def test_filter_contains(self):
-        """ Scan overflow field can filter contains """
-        u = User(id='a', name='Adam', foobar=set(['hi']))
-        u2 = User(id='a', name='Aaron', foobar=set(['ih']))
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar').contains_('hi')).all()
-        self.assertEquals(results, [u])
-
-    def test_filter_null(self):
-        """ Scan overflow field can filter null """
-        u = User(id='a', name='Adam', foobar='hi')
-        u2 = User(id='a', name='Aaron')
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') == None).all()  # noqa
-        self.assertEquals(results, [u2])
-
-    def test_filter_not_null(self):
-        """ Scan overflow field can filter not null """
-        u = User(id='a', name='Adam', foobar='hi')
-        u2 = User(id='a', name='Aaron')
-        self.engine.save([u, u2])
-
-        results = self.engine.scan(User)\
-            .filter(User.field_('foobar') != None).all()  # noqa
-        self.assertEquals(results, [u])
 
 
 class Widget(Model):

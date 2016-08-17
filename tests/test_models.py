@@ -57,9 +57,9 @@ class Post(Model):
     score = Composite('likes', 'ts', 'deleted', data_type=NUMBER,
                       merge=lambda x, y, z: None if z else x + y)
     likes = Field(data_type=int, default=0)
-    ts = Field(data_type=float, default=0)
-    deleted = Field(data_type=bool, default=False)
-    points = Field(data_type=Decimal, default=Decimal('0'))
+    ts = Field(type=float, default=0)
+    deleted = Field(type=bool, default=False)
+    points = Field(type=Decimal, default=Decimal('0'))
     about = Field()
     text = Field()
     tags = Field(data_type=set)
@@ -196,26 +196,6 @@ class TestModelMutation(DynamoSystemTest):
         self.assertEquals(result['title'], a2.title)
         self.assertEquals(result['text'], a2.text)
 
-    def test_overwrite_all_fields(self):
-        """ Save will clear existing, unspecified fields """
-        a = Article(alpha='hi')
-        self.engine.save(a)
-        a2 = Article(beta='ih')
-        self.engine.save(a2, overwrite=True)
-        tablename = a.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertEquals(result['title'], a2.title)
-        self.assertEquals(json.loads(result['beta']), a2.beta)
-        self.assertIsNone(result.get('alpha'))
-
-    def test_save_conflict_extra(self):
-        """ Save without overwrite raises error if unset fields differ """
-        a = Article(alpha='hi')
-        self.engine.save(a)
-        a2 = Article(beta='ih')
-        with self.assertRaises(ConditionalCheckFailedException):
-            self.engine.save(a2, overwrite=False)
-
     def test_sync_new(self):
         """ Sync on a new item will create the item """
         p = Post('a', 'b', 4)
@@ -233,15 +213,15 @@ class TestModelMutation(DynamoSystemTest):
     def test_sync_merges_fields(self):
         """ Syncing two new items with same pkey merges other fields """
         a = Article('a')
-        a.author = 'me'
-        self.engine.sync(a, raise_on_conflict=False)
+        a.text = 'foobar'
+        self.engine.sync(a, raise_on_conflict=True)
 
         a2 = Article('a')
-        a2.comments = 3
-        self.engine.sync(a2, raise_on_conflict=False)
+        a2.views = 3
+        self.engine.sync(a2, raise_on_conflict=True)
 
-        self.assertEquals(a2.author, 'me')
-        self.assertEquals(a2.comments, 3)
+        self.assertEquals(a2.text, 'foobar')
+        self.assertEquals(a2.views, 3)
 
     def test_sync_only_updates_changed(self):
         """ Sync only updates fields that have been changed """
@@ -256,12 +236,12 @@ class TestModelMutation(DynamoSystemTest):
 
             p = Post('a', 'b', 4)
             self.engine.save(p)
-            p.foobar = set('a')
             p.ts = 4
+            p.tags = set('a')
             p.points = Decimal('2')
             p.sync(raise_on_conflict=False)
             self.assertEqual(len(captured_updates), 2)
-            self.assertTrue(ItemUpdate.put('foobar', ANY) in captured_updates)
+            self.assertTrue(ItemUpdate.put('tags', ANY) in captured_updates)
             self.assertTrue(ItemUpdate.put('points', ANY) in captured_updates)
 
     def test_sync_constraints(self):
@@ -380,12 +360,12 @@ class TestModelMutation(DynamoSystemTest):
     def test_sync_conflict(self):
         """ With sync raise_on_conflict=True, parallel writes raise error """
         p = Post('a', 'b', 4)
-        p.foobar = "foo"
+        p.text = "foo"
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
-        p.foobar = "hey"
+        p.text = "hey"
         p.sync()
-        p2.foobar = "hi"
+        p2.text = "hi"
         with self.assertRaises(ConditionalCheckFailedException):
             p2.sync(raise_on_conflict=True)
 
@@ -394,9 +374,9 @@ class TestModelMutation(DynamoSystemTest):
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
-        p.foobar = "hey"
+        p.text = "hey"
         p.sync()
-        p2.foobar = "hi"
+        p2.text = "hi"
         with self.assertRaises(ConditionalCheckFailedException):
             p2.sync(raise_on_conflict=True)
 
@@ -449,11 +429,11 @@ class TestModelMutation(DynamoSystemTest):
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
-        p.incr_(foobar=5)
+        p.incr_(points=5)
         p.sync()
-        p2.incr_(foobar=3)
+        p2.incr_(points=3)
         p2.sync(raise_on_conflict=False)
-        self.assertEquals(p2.foobar, 8)
+        self.assertEquals(p2.points, 8)
 
     def test_incr_float(self):
         """ Increment works on floats """
@@ -480,46 +460,46 @@ class TestModelMutation(DynamoSystemTest):
         p = Post('a', 'b', 4)
         self.engine.save(p)
         p2 = self.engine.scan(Post).first()
-        p.incr_(foobar=5)
+        p.incr_(points=5)
         p.sync()
-        p2.incr_(foobar=3)
+        p2.incr_(points=3)
         p2.sync(raise_on_conflict=True)
-        self.assertEqual(p2.foobar, 8)
+        self.assertEqual(p2.points, 8)
 
     def test_double_incr(self):
         """ Incrementing a field twice should work fine """
         p = Post('a', 'b', 4)
-        p.foobar = 2
+        p.likes = 2
         self.engine.save(p)
-        p.incr_(foobar=5)
-        p.incr_(foobar=3)
-        self.assertEquals(p.foobar, 10)
+        p.incr_(likes=5)
+        p.incr_(likes=3)
+        self.assertEquals(p.likes, 10)
         p.sync()
-        self.assertEquals(p.foobar, 10)
+        self.assertEquals(p.likes, 10)
 
     def test_incr_set(self):
         """ Increment then set value raises exception """
         p = Post('a', 'b', 4)
         self.engine.save(p)
-        p.incr_(foobar=7)
+        p.incr_(likes=7)
         with self.assertRaises(ValueError):
-            p.foobar = 2
+            p.likes = 2
 
     def test_set_incr(self):
         """ Set value then increment raises exception """
         p = Post('a', 'b', 4)
         self.engine.save(p)
-        p.foobar = 2
+        p.likes = 2
         with self.assertRaises(ValueError):
-            p.incr_(foobar=5)
+            p.incr_(likes=5)
 
     def test_incr_read(self):
         """ Value changes immediately on incr """
-        p = Post('a', 'b', 4)
+        p = Post('a', 'b', ts=4)
         self.engine.save(p)
-        p.incr_(ts=6, foobar=3)
+        p.incr_(ts=6, likes=3)
         self.assertEquals(p.ts, 10)
-        self.assertEquals(p.foobar, 3)
+        self.assertEquals(p.likes, 3)
 
     def test_incr_unpersisted(self):
         """ Calling incr_ on unpersisted item merges with existing data """
@@ -530,17 +510,6 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.sync(a)
         a = self.engine.scan(Article).first()
         self.assertEqual(a.views, 6)
-
-    def test_incr_unpersisted_overflow(self):
-        """ Calling incr_ on unpersisted item overflow field merges data """
-        a = Article()
-        a.num = 2
-        self.engine.save(a)
-        a = Article()
-        a.incr_(num=4)
-        self.engine.sync(a)
-        a = self.engine.scan(Article).first()
-        self.assertEqual(a.num, 6)
 
     def test_incr_composite_piece(self):
         """ Incrementing a field will change any dependent composite fields """
@@ -588,18 +557,6 @@ class TestModelMutation(DynamoSystemTest):
         self.engine.save(p)
         with self.assertRaises(TypeError):
             p.incr_(score=4)
-
-    def test_delete_overflow_field(self):
-        """ Can delete overflow fields by setting to None """
-        p = Post('a', 'b', 0)
-        p.foobar = 'hi'
-        self.engine.save(p)
-        p.foobar = None
-        p.sync()
-
-        tablename = p.meta_.ddb_tablename(self.engine.namespace)
-        result = six.next(self.dynamo.scan(tablename))
-        self.assertFalse('foobar' in result)
 
     def test_add_to_set(self):
         """ Adding a value to a set should be atomic """
@@ -670,14 +627,6 @@ class TestModelMutation(DynamoSystemTest):
         with self.assertRaises(TypeError):
             p.add_(keywords=4)
 
-    def test_no_add_and_set(self):
-        """ Cannot both add_ to a set and set the value in same update """
-        # Note that this behavior is only working on overflow fields ATM
-        p = Post('a', 'b', 0)
-        p.foobars = set(['a'])
-        with self.assertRaises(ValueError):
-            p.add_(foobars='b')
-
     def test_remove_from_set_presync(self):
         """ Removing from a set should update local model value """
         p = Post('a', 'b', 0)
@@ -697,16 +646,6 @@ class TestModelMutation(DynamoSystemTest):
         p.sync()
         p2.sync()
         self.assertEqual(p2.tags, set(['d']))
-
-    def test_add_to_overflow_set(self):
-        """ Can atomically add to sets that are not declared Fields """
-        p = Post('a', 'b', 0)
-        p.add_(fooset='a')
-        self.engine.save(p)
-        p.add_(fooset='b')
-        p.sync()
-        ret = self.engine.scan(Post).one()
-        self.assertEqual(ret.fooset, set(['a', 'b']))
 
     def test_remove_set_keyerror(self):
         """ Cannot remove missing elements from set """
@@ -737,21 +676,32 @@ class TestModelMutation(DynamoSystemTest):
         stored_a = self.engine.scan(Article).first()
         self.assertIsNone(stored_a.text)
 
-    def test_delattr_overflow_field(self):
-        """ Deleting a field deletes it from Dynamo """
-        a = Article(publication='The Onion')
-        self.engine.save(a)
-        del a.publication
-        a.sync()
-        stored_a = self.engine.scan(Article).first()
-        self.assertIsNone(stored_a.get_('publication'))
-
     def test_delattr_private_field(self):
         """ Deleting a private field works like normal """
         a = Article()
         a._foobar = 'foobar'
         del a._foobar
         self.assertFalse(hasattr(a, '_foobar'))
+
+    def test_sync_refresh(self):
+        """ Syncing a model with no changes will refresh the data """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        self.engine.sync(a2)
+        a.sync()
+        self.assertEqual(a.text, 'bar')
+
+    def test_sync_no_read(self):
+        """ Sync(no_read=True) performs a write and no reads """
+        a = Article(text='foo')
+        self.engine.save(a)
+        a2 = self.engine.scan(Article).first()
+        a2.text = 'bar'
+        self.engine.sync(a2)
+        a.sync(no_read=True)
+        self.assertEqual(a.text, 'foo')
 
 
 class TestUpdateField(DynamoSystemTest):
@@ -1037,12 +987,11 @@ class TestModelDefaults(unittest.TestCase):
 
     def test_json(self):
         """ Model has default JSON serialization method """
-        m = Bare('a', 1, foo='bar')
+        m = Bare('a', 1)
         js = m.__json__()
         self.assertEqual(js, {
             'id': 'a',
             'score': 1,
-            'foo': 'bar',
         })
 
     def test_equality(self):
