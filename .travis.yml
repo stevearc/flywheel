@@ -9,7 +9,7 @@ env:
   - TOXENV=py34
   - TOXENV=py35
 install:
-  - pip install tox coveralls --use-mirrors
+  - pip install tox coveralls
 script: tox
 after_success:
   if [ "$TOXENV" == "py27" ]; then coveralls; fi

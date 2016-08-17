@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.4.11
+------
+* Bug fix: Boolean overflow fields no longer decoded as decimals (:pr:`46`)
+
 0.4.10
 ------
 * Feature: Add ``exists()`` method to Engine (:issue:`45`)
