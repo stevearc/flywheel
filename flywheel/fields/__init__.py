@@ -257,7 +257,7 @@ class Field(object):
         if isinstance(val, bool):
             return val
         elif (isinstance(val, Decimal) or isinstance(val, float) or
-                isinstance(val, six.integer_types)):
+              isinstance(val, six.integer_types)):
             if val % 1 == 0:
                 return int(val)
             return float(val)
