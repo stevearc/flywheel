@@ -18,7 +18,7 @@ This is what a basic model looks like (schema taken from this `DynamoDB
 API documentation
 <http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html>`_)
 
-::
+.. sourcecode:: python
 
     from flywheel import Model, Field, GlobalIndex
 
@@ -41,7 +41,7 @@ API documentation
 
 Create a new top score
 
-::
+.. sourcecode:: python
 
     >>> score = GameScore('Master Blaster', 'abc')
     >>> score.top_score = 9001
@@ -50,20 +50,20 @@ Create a new top score
 
 Get all top scores for a user
 
-::
+.. sourcecode:: python
 
     >>> scores = engine.query(GameScore).filter(userid='abc').all()
 
 Get the top score for Galaxy Invaders
 
-::
+.. sourcecode:: python
 
     >>> top_score = engine.query(GameScore).filter(title='Galaxy Invaders')\
     ...     .first(desc=True)
 
 Atomically increment a user's "wins" count on Alien Adventure
 
-::
+.. sourcecode:: python
 
     >>> score = GameScore('Alien Adventure', 'abc')
     >>> score.incr_(wins=1)
@@ -71,7 +71,7 @@ Atomically increment a user's "wins" count on Alien Adventure
 
 Get all scores on Comet Quest that are over 9000
 
-::
+.. sourcecode:: python
 
     >>> scores = engine.query(GameScore).filter(GameScore.top_score > 9000,
     ...                                         title='Comet Quest').all()
