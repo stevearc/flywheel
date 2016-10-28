@@ -3,7 +3,7 @@ Flywheel - Object Mapper for DynamoDB
 Flywheel is a library for mapping python objects to DynamoDB tables. It uses a
 SQLAlchemy-like syntax for queries.
 
-Code lives here: https://github.com/mathcamp/flywheel
+Code lives here: https://github.com/stevearc/flywheel
 
 User Guide
 ----------
