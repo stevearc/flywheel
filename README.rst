@@ -3,12 +3,12 @@ Flywheel
 :Build: |build|_ |coverage|_
 :Documentation: http://flywheel.readthedocs.org/
 :Downloads: http://pypi.python.org/pypi/flywheel
-:Source: https://github.com/mathcamp/flywheel
+:Source: https://github.com/stevearc/flywheel
 
-.. |build| image:: https://travis-ci.org/mathcamp/flywheel.png?branch=master
-.. _build: https://travis-ci.org/mathcamp/flywheel
-.. |coverage| image:: https://coveralls.io/repos/mathcamp/flywheel/badge.png?branch=master
-.. _coverage: https://coveralls.io/r/mathcamp/flywheel?branch=master
+.. |build| image:: https://travis-ci.org/stevearc/flywheel.png?branch=master
+.. _build: https://travis-ci.org/stevearc/flywheel
+.. |coverage| image:: https://coveralls.io/repos/stevearc/flywheel/badge.png?branch=master
+.. _coverage: https://coveralls.io/r/stevearc/flywheel?branch=master
 
 Object mapper for Amazon's DynamoDB
 
