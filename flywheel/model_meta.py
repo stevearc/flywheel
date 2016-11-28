@@ -3,7 +3,7 @@ import six
 import time
 
 import inspect
-from dynamo3 import DynamoKey, Throughput
+from dynamo3 import DynamoKey, Throughput, IndexUpdate
 from collections import defaultdict
 
 from .fields import Field
@@ -488,6 +488,80 @@ class ModelMetadata(object):
         if not test:
             connection.create_table(tablename, hash_key, range_key,
                                     indexes, global_indexes, table_throughput)
+            if wait:
+                desc = connection.describe_table(tablename)
+                while desc.status != 'ACTIVE':
+                    time.sleep(1)
+                    desc = connection.describe_table(tablename)
+
+        return tablename
+
+    def update_dynamo_schema(self, connection, test=False,
+                             wait=False, throughput=None, namespace=()):
+        """
+        Updates all Dynamo table global indexes for this model
+
+        Parameters
+        ----------
+        connection : :class:`~dynamo3.DynamoDBConnection`
+        test : bool, optional
+            If True, don't actually create the table (default False)
+        wait : bool, optional
+            If True, block until table has been created (default False)
+        throughput : dict, optional
+            The throughput of the table and global indexes. Has the keys 'read'
+            and 'write'. To specify throughput for global indexes, add the name
+            of the index as a key and another 'read', 'write' dict as the
+            value.
+        namespace : str or tuple, optional
+            The namespace of the table
+
+        Returns
+        -------
+        table : str
+            Table name that altered, or None if nothing altered
+
+        """
+        if self.abstract:
+            return None
+        tablename = self.ddb_tablename(namespace)
+
+        global_indexes = []
+
+        for gindex in self.global_indexes:
+            index = gindex.get_ddb_index(self.fields)
+            if throughput is not None and gindex.name in throughput:
+                index.throughput = Throughput(**throughput[gindex.name])
+            global_indexes.append(index)
+
+        if not global_indexes:
+            return None
+
+        table = connection.describe_table(tablename)
+
+        expected_indexes = {}
+        for i in global_indexes:
+            expected_indexes[i.name] = i
+        actual_indexes = {}
+        for i in table.global_indexes:
+            actual_indexes[i.name] = i
+
+        missing_index_names = set(expected_indexes.keys()) - set(actual_indexes.keys())
+        missing_indexes = [expected_indexes[i] for i in missing_index_names]
+
+        updates = [IndexUpdate.create(index) for index in missing_indexes]
+
+        update_indexes_name = set(expected_indexes.keys()) & set(actual_indexes.keys())
+        update_indexes = [expected_indexes[i] for i in update_indexes_name if
+                          actual_indexes[i].throughput != expected_indexes[i].throughput]
+
+        updates.extend([IndexUpdate.update(index.name, index.throughput) for index in update_indexes])
+
+        if not updates:
+            return None
+
+        if not test:
+            connection.update_table(tablename, index_updates=updates)
             if wait:
                 desc = connection.describe_table(tablename)
                 while desc.status != 'ACTIVE':
