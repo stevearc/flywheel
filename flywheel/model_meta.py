@@ -524,6 +524,7 @@ class ModelMetadata(object):
         """
         if self.abstract:
             return None
+
         tablename = self.ddb_tablename(namespace)
 
         global_indexes = []
@@ -538,6 +539,8 @@ class ModelMetadata(object):
             return None
 
         table = connection.describe_table(tablename)
+        if not table:
+            return None
 
         expected_indexes = {}
         for i in global_indexes:
