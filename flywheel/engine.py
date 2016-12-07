@@ -215,6 +215,53 @@ class Engine(object):
                 changed.append(result)
         return changed
 
+    def update_schema(self, test=False, throughput=None):
+        """
+        Updates the DynamoDB table global indexes required by the registered models
+
+        Parameters
+        ----------
+        test : bool, optional
+            If True, perform a dry run (default False)
+        throughput : dict, optional
+            If provided, override the throughputs of the Models when creating
+            them. Details below.
+
+        Returns
+        -------
+        names : list
+            List of table names that were updated
+
+        Examples
+        --------
+        The ``throughput`` argument is a mapping of table names to their
+        throughputs. The throughput is a dict with a 'read' and 'write' value.
+        It may also include the names of global indexes that map to their own
+        dicts with a 'read' and 'write' value.
+
+        .. code-block:: python
+
+            engine.create_schema(throughput={
+                'table1': {
+                    'gindex-1': {
+                        'read': 6,
+                        'write': 3,
+                    }
+                }
+            })
+
+        """
+        throughput = throughput or {}
+        changed = []
+        for model in six.itervalues(self.models):
+            result = model.meta_.update_dynamo_schema(
+                self.dynamo, test=test, wait=True,
+                throughput=throughput.get(model.meta_.ddb_tablename()),
+                namespace=self.namespace)
+            if result:
+                changed.append(result)
+        return changed
+
     def delete_schema(self, test=False):
         """
         Drop the DynamoDB tables for all registered models
@@ -236,7 +283,8 @@ class Engine(object):
             result = model.meta_.delete_dynamo_schema(self.dynamo, tablenames,
                                                       test=test, wait=True,
                                                       namespace=self.namespace)
-            changed.append(result)
+            if result:
+                changed.append(result)
         return changed
 
     def get_schema(self):

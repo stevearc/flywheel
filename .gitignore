@@ -44,3 +44,4 @@ _build
 
 # vim
 *.swp
+/.idea
