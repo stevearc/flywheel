@@ -4,8 +4,8 @@ To get started developing flywheel, run the following command:
 
 .. code-block:: bash
 
-    wget https://raw.github.com/mathcamp/devbox/0.1.0/devbox/unbox.py && \
-    python unbox.py git@github.com:mathcamp/flywheel
+    wget https://raw.github.com/stevearc/devbox/0.1.0/devbox/unbox.py && \
+    python unbox.py git@github.com:stevearc/flywheel
 
 This will clone the repository and install the package into a virtualenv
 

@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.5.1
+-----
+* Feature: Add ``update_schema()`` method to Engine (:pr:`53`)
+
 0.5.0
 -----
 * **Breakage**: Removing support for overflow fields. The only fields flywheel will care about now are those that are explicitly set as a Field()
