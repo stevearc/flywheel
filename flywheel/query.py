@@ -165,7 +165,7 @@ class Query(object):
     def one(self, consistent=False, attributes=None, filter_or=False):
         """
         Return the result of the query. If there is not exactly one result,
-        raise a ValueError
+        raises an exception (details below)
 
         Parameters
         ----------
