@@ -12,6 +12,14 @@ Flywheel
 
 Object mapper for Amazon's DynamoDB
 
+**END OF LIFE WARNING**: I haven't personally used this project, or even written
+much python, since early 2014. I will continue to respond to bugs and pull
+requests, but I am no longer doing active development. My apologies to those of
+you who have come to rely on Flywheel; I wish I had the time to continue it.
+
+If you are looking for an alternative, I can recommend `PynamoDB
+<https://github.com/jlafon/PynamoDB>`_.
+
 Getting Started
 ===============
 This is what a basic model looks like (schema taken from this `DynamoDB
