@@ -165,7 +165,7 @@ class Query(object):
     def one(self, consistent=False, attributes=None, filter_or=False):
         """
         Return the result of the query. If there is not exactly one result,
-        raise a ValueError
+        raises an exception (details below)
 
         Parameters
         ----------
@@ -202,6 +202,11 @@ class Query(object):
     def limit(self, count):
         """ Limit the number of query results """
         self.condition &= Condition.construct_limit(count)
+        return self
+
+    def scan_limit(self, count):
+        """ Limit the number of items scanned """
+        self.condition &= Condition.construct_scan_limit(count)
         return self
 
     def index(self, name):

@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.5.2
+-----
+* Bug fix: Change limit behavior to match docs. ``query().limit()`` will limit the number of results, ``query().scan_limit()`` will limit number of items scanned (:issue:`57`)
+
 0.5.1
 -----
 * Feature: Add ``update_schema()`` method to Engine (:pr:`53`)

@@ -1,5 +1,7 @@
 """ Query constraints """
 import six
+from dynamo3 import Limit
+
 
 FILTER_ONLY = set(['contains', 'ncontains', 'null', 'in', 'ne'])
 
@@ -15,8 +17,10 @@ class Condition(object):
         Mapping of field name to field value
     fields : dict
         Mapping of field name to (operator, value) tuples
-    limit : int
+    limit : int or :class:`dynamo3.Limit`
         Maximum number of results
+    scan_limit : int
+        Maximum number of items to scan in DynamoDB
     index_name : str
         Name of index to use for a query
 
@@ -26,7 +30,17 @@ class Condition(object):
         self.eq_fields = {}
         self.fields = {}
         self.limit = None
+        self.scan_limit = None
         self.index_name = None
+
+    def _add_limit(self, kwargs):
+        """ Add the limit kwarg if necessary """
+        if self.limit is not None or self.scan_limit is not None:
+            if isinstance(self.limit, Limit):
+                kwargs['limit'] = self.limit
+            else:
+                kwargs['limit'] = Limit(scan_limit=self.scan_limit,
+                                        item_limit=self.limit, strict=True)
 
     def scan_kwargs(self):
         """ Get the kwargs for doing a table scan """
@@ -35,8 +49,7 @@ class Condition(object):
             kwargs["%s__eq" % key] = val
         for key, (op, val) in six.iteritems(self.fields):
             kwargs["%s__%s" % (key, op)] = val
-        if self.limit is not None:
-            kwargs['limit'] = self.limit
+        self._add_limit(kwargs)
         return kwargs
 
     def query_kwargs(self, model):
@@ -57,8 +70,7 @@ class Condition(object):
                              "range key")
         kwargs = ordering.query_kwargs(self.eq_fields, self.fields)
 
-        if self.limit is not None:
-            kwargs['limit'] = self.limit
+        self._add_limit(kwargs)
         return kwargs
 
     @classmethod
@@ -110,6 +122,24 @@ class Condition(object):
         """
         c = cls()
         c.limit = count
+        return c
+
+    @classmethod
+    def construct_scan_limit(cls, count):
+        """
+        Create a condition that will limit the number of items scanned
+
+        Parameters
+        ----------
+        count : int
+
+        Returns
+        -------
+        condition : :class:`.Condition`
+
+        """
+        c = cls()
+        c.scan_limit = count
         return c
 
     @classmethod

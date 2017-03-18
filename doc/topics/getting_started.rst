@@ -58,20 +58,11 @@ To get data back out, query it using the engine:
     # Get a specific tweet by a user
     tweet = engine.query(Tweet).filter(userid='myuser', id='1234').first()
 
-Since DynamoDB has no schema, you can set arbitrary fields on the tweets:
-
-.. code-block:: python
-
-    tweet = Tweet('myuser', '1234', datetime.utcnow(), text='super rad')
-    tweet.link = 'http://drmcninja.com'
-    tweet.retweets = 0
-    engine.save(tweet)
-
 If you want to change a field, just make the change and sync it:
 
 .. code-block:: python
 
-    tweet.link = 'http://www.smbc-comics.com'
+    tweet.text = 'This tweet has been removed due to shameless promotion'
     tweet.sync()
 
 That's enough to give you a taste. The rest of the docs have more information
