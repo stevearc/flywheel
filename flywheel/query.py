@@ -204,6 +204,11 @@ class Query(object):
         self.condition &= Condition.construct_limit(count)
         return self
 
+    def scan_limit(self, count):
+        """ Limit the number of items scanned """
+        self.condition &= Condition.construct_scan_limit(count)
+        return self
+
     def index(self, name):
         """ Use a specific local or global index for the query """
         self.condition &= Condition.construct_index(name)
