@@ -38,6 +38,7 @@ flywheel_env
 .ropeproject
 _localhost.db
 _local.db
+/venv/
 
 # docs
 _build

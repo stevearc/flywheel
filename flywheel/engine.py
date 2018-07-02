@@ -516,11 +516,12 @@ class Engine(object):
                         item.post_save_()
             else:
                 for item in items:
-                    expected = dict(((k + '__null', True) for k in
-                                     item.pk_dict_))
+                    condition = " AND ".join([
+                        "attribute_not_exists({})".format(k)
+                        for k in item.pk_dict_])
                     item.pre_save_(self)
-                    self.dynamo.put_item(tablename, item.ddb_dump_(),
-                                         **expected)
+                    self.dynamo.put_item2(tablename, item.ddb_dump_(),
+                                          condition=condition)
                     item.post_save_()
 
     def refresh(self, items, consistent=False):
