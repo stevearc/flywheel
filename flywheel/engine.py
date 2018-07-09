@@ -553,7 +553,7 @@ class Engine(object):
                                             consistent=consistent)
             meta = items[0].meta_
             for result in results:
-                pkey = meta.pk_tuple(None, result, ddb_load=True)
+                pkey = meta.pk_tuple(None, result)
                 item = model_map[tablename].get(pkey)
                 if item is None:
                     LOG.error("Refresh error: Cannot match primary key %r to "
