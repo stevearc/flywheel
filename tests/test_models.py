@@ -7,9 +7,9 @@ from decimal import Decimal
 from mock import patch, ANY
 from dynamo3 import ItemUpdate
 
-from flywheel import (Field, Composite, Model, NUMBER, GlobalIndex,
+from flywheel import (Field, Composite, Model, NUMBER, STRING, GlobalIndex,
                       ConditionalCheckFailedException)
-from flywheel.fields.types import UTC
+from flywheel.fields.types import UTC, register_type, TypeDefinition
 from flywheel.tests import DynamoSystemTest
 try:
     import unittest2 as unittest  # pylint: disable=F0401
@@ -69,6 +69,32 @@ class Post(Model):
     def __init__(self, userid, id, ts, text='foo', about='bar'):
         super(Post, self).__init__(userid=userid, id=id, ts=ts, text=text,
                                    about=about)
+
+
+class CustomDataType(TypeDefinition):
+    """ Custom data type that prepends 'custom:' before the string """
+
+    data_type = 'customtype'
+    ddb_data_type = STRING
+
+    def coerce(self, value, force):
+        return value
+
+    def ddb_dump(self, value):
+        return 'custom:' + value
+
+    def ddb_load(self, value):
+        return value[len('custom:'):]
+
+
+register_type(CustomDataType)
+
+
+class CustomPkey(Model):
+
+    """ Test model with datetime primary key """
+    hkey = Field(data_type=CustomDataType, hash_key=True)
+    text = Field()
 
 
 class TestComposite(DynamoSystemTest):
@@ -166,7 +192,7 @@ class Article(Model):
 class TestModelMutation(DynamoSystemTest):
 
     """ Tests for model mutation methods """
-    models = [Post, Article]
+    models = [Post, Article, CustomPkey]
 
     def test_save(self):
         """ Saving item puts it in the database """
@@ -335,6 +361,16 @@ class TestModelMutation(DynamoSystemTest):
         self.assertEqual(p1.ts, 4)
         self.assertEqual(p2.ts, 5)
         self.assertEqual(p3.ts, 6)
+
+    def test_refresh_custom_pkey(self):
+        """ Refresh works when model declares custom Primary Key """
+        p = CustomPkey('key', text='foo')
+        self.engine.save(p)
+        p2 = self.engine.scan(CustomPkey).first()
+        p.text = 'bar'
+        p.sync()
+        p2.refresh()
+        self.assertEquals(p2.text, p.text)
 
     def test_sync_blank(self):
         """ Sync creates item even if only primary key is set """
