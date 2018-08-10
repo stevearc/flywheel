@@ -1,5 +1,5 @@
-pylint==1.5.1
-pep8
+pylint==1.7.1
+pycodestyle
 autopep8
 tox
 nose

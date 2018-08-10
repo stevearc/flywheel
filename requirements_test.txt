@@ -1,0 +1,5 @@
+nose
+mock
+coverage
+pylint==1.7.1
+pycodestyle

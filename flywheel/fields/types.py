@@ -200,6 +200,7 @@ class SetType(TypeDefinition):
         """ Create a set factory that will contain a specific data type """
         return functools.partial(cls, item_type)
 
+
 register_type(SetType, allow_in_set=False)
 ALL_TYPES[STRING_SET] = SetType.bind(STRING)
 ALL_TYPES[BINARY_SET] = SetType.bind(BINARY)
@@ -232,6 +233,7 @@ class NumberType(TypeDefinition):
                 return float(value)
         return value
 
+
 register_type(NumberType)
 
 
@@ -255,6 +257,7 @@ class FloatType(TypeDefinition):
 
     def ddb_load(self, value):
         return float(value)
+
 
 register_type(FloatType)
 
@@ -282,6 +285,7 @@ class IntType(TypeDefinition):
 
     def ddb_load(self, value):
         return int(value)
+
 
 register_type(IntType)
 
@@ -311,6 +315,7 @@ class DecimalType(TypeDefinition):
                 raise TypeError()
         return value
 
+
 register_type(DecimalType)
 
 
@@ -333,6 +338,7 @@ class BoolType(TypeDefinition):
                 raise TypeError()
         return value
 
+
 register_type(BoolType)
 
 
@@ -353,6 +359,7 @@ class StringType(TypeDefinition):
             else:
                 raise TypeError()
         return value
+
 
 register_type(StringType)
 
@@ -381,6 +388,7 @@ class BinaryType(TypeDefinition):
     def ddb_load(self, value):
         return value.value
 
+
 register_type(BinaryType)
 
 
@@ -402,6 +410,7 @@ class DictType(TypeDefinition):
             else:
                 raise TypeError()
         return value
+
 
 register_type(DictType)
 
@@ -425,6 +434,7 @@ class ListType(TypeDefinition):
                 raise TypeError()
         return value
 
+
 register_type(ListType)
 
 
@@ -445,6 +455,7 @@ class UTCTimezone(datetime.tzinfo):
 
     def dst(self, dt):
         return ZERO
+
 
 UTC = UTCTimezone()
 
@@ -492,6 +503,7 @@ class DateTimeType(TypeDefinition):
             return dt
         else:
             return dt.replace(tzinfo=UTC)
+
 
 register_type(DateTimeType)
 
