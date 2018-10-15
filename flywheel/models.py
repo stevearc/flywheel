@@ -87,7 +87,7 @@ class SetDelta(object):
 class Model(six.with_metaclass(ModelMetaclass)):
 
     """
-    Base class for all tube models
+    Base class for all flywheel models
 
     For documentation on the metadata fields, check the attributes on the
     :class:`.ModelMetadata` class.
