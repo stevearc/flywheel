@@ -1,11 +1,9 @@
 """ Setup file """
-import sys
-
-from setuptools import setup, find_packages
-
 import os
 import re
+import sys
 
+from setuptools import find_packages, setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, 'README.rst')).read()
@@ -16,7 +14,7 @@ CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 CHANGES = re.sub(r'\(\s*:(issue|pr|sha):.*?\)', '', CHANGES)
 
 REQUIREMENTS = [
-    'dynamo3>=0.4.9',
+    'dynamo3>=0.4.9,<1.0',
     'six'
 ]
 
