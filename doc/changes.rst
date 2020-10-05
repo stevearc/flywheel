@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.5.4
+-----
+* Constrain version of ``dynamo3`` dependency to avoid breakage
+
 0.5.3
 -----
 * Bug fix: Fix refresh when using custom-typed primary keys (:pr:`63`)
