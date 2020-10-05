@@ -26,7 +26,7 @@ TEST_REQUIREMENTS = [
 if __name__ == "__main__":
     setup(
         name='flywheel',
-        version='0.5.3',
+        version='0.5.4',
         description="SQLAlchemy-style ORM for Amazon's DynamoDB",
         long_description=README + '\n\n' + CHANGES,
         classifiers=[
