@@ -255,7 +255,7 @@ class TestModelMutation(DynamoSystemTest):
             captured_updates = []
 
             def update_item(_, __, updates, *___, **____):
-                """ Mock update_item and capture the passed updateds """
+                """ Mock update_item and capture the passed updates """
                 captured_updates.extend(updates)
                 return {}
             dynamo.update_item.side_effect = update_item

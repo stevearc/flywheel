@@ -5,7 +5,7 @@ Composite Fields
 Composite fields allow you to create fields that are combinations of multiple
 other fields. Suppose you're creating a table where you plan to store a
 collection of social media items (tweets, facebook posts, instagram pics, etc).
-If you make the hash key the id of the item, there is the remote possiblity
+If you make the hash key the id of the item, there is the remote possibility
 that a tweet id will collide with a facebook id. Here is the solution:
 
 .. code-block:: python
