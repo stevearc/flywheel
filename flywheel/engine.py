@@ -593,7 +593,7 @@ class Engine(object):
         ------
         exc : :class:`dynamo3.CheckFailed`
             If raise_on_conflict=True and the data in dynamo fails the
-            contraint checks.
+            constraint checks.
 
         """
         if raise_on_conflict is None:

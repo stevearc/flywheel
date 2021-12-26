@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, 'README.rst')).read()
-# Remove syntax highighting for pypi
+# Remove syntax highlighting for pypi
 README = re.sub(r'.. sourcecode.*', '::', README)
 CHANGES = open(os.path.join(HERE, 'CHANGES.rst')).read()
 # Remove custom RST extensions for pypi
